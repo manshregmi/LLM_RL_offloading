@@ -1,0 +1,179 @@
+"""
+Training script for pure latency minimization.
+No deadlines, no surplus, no negative counts - just minimize latency!
+"""
+
+import numpy as np
+from profiling.profiling_class import ProfilingData
+from models.a2c_model import TabularActorCriticAgent
+
+
+def create_initial_state(simulator):
+    """
+    Create initial state for an episode.
+    
+    State format: [bandwidth, cloud_contention, layer, previous_assignment]
+    """
+    bandwidth = simulator.get_current_bandwidth()
+    cloud_contention = 0.0  # No pending cloud tasks at start
+    layer = 0  # Start at first layer
+    previous_assignment = None  # No previous layer
+    
+    return (bandwidth, cloud_contention, layer, previous_assignment)
+
+
+def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False, verbose=True): 
+    """Main training loop."""
+    
+    # Create agent
+    agent = TabularActorCriticAgent(
+        profiling_data=profiling_data,
+        is_test=is_test,
+        alpha_actor=0.02,
+        alpha_critic=0.05,
+        gamma=0.95,
+        reward_scale=10.0,  # Scale reward magnitude
+    )
+    
+    # Training parameters
+    NUM_EPISODES = episodes
+    PRINT_INTERVAL = 10
+    
+    # Tracking
+    episode_latencies = []
+    episode_rewards = []
+    best_latency = float('inf')
+    best_episode = 0
+    
+    print("=" * 80)
+    print("TRAINING: Pure Latency Minimization")
+    print("=" * 80)
+    print("Goal: Minimize total inference latency")
+    print("No deadlines, no surplus, no negative counts")
+    print("=" * 80)
+    print(f"Total episodes: {NUM_EPISODES}")
+    print(f"Learning rates: actor={agent.alpha_actor}, critic={agent.alpha_critic}")
+    print(f"Discount factor: γ={agent.gamma}")
+    print(f"Reward scale: {agent.reward_scale}")
+    print("=" * 80)
+    state = create_initial_state(agent.simulator)
+    bandwidth = state[0]
+    cloud_contention = state[1]
+    state = (bandwidth, cloud_contention, 0, None)  # Start at layer 0 with no previous assignment
+
+    agent.load()  # Load existing model if available
+    for episode in range(NUM_EPISODES):
+        state = (bandwidth, cloud_contention, 0, None)
+        # Start episode
+        agent.start_episode()
+        done = False
+        step_count = 0
+        td_errors = []
+        
+        # Run episode
+        while not done:
+            action, reward, latency_s, next_state, done = agent.step(state)
+            # print("done", done)
+            bandwidth = next_state[0]
+            cloud_contention = next_state[1]
+            td_error = agent.update(state, action, reward, next_state, done)
+            td_errors.append(td_error)
+            state = next_state
+            step_count += 1
+            # print(f"Step {step_count} | Action: {action} | Reward: {reward:.2f} | Latency: {latency_s*1000:.2f}ms | TD Error: {td_error:.2f}")
+        # print(f"Episode {episode} completed in {step_count} steps with total latency {agent.current_episode_latency:.2f}ms and reward {agent.current_episode_reward:.2f}")
+        
+        # End episode
+        total_latency_ms, total_reward = agent.end_episode()
+        episode_latencies.append(total_latency_ms)
+        episode_rewards.append(total_reward)
+        
+        # Update best
+        if total_latency_ms < best_latency:
+            best_latency = total_latency_ms
+            best_episode = episode
+        
+        # Logging
+        if episode % PRINT_INTERVAL == 0:
+            avg_latency = np.mean(episode_latencies[-PRINT_INTERVAL:])
+            avg_reward = np.mean(episode_rewards[-PRINT_INTERVAL:])
+            avg_td_error = np.mean(td_errors) if td_errors else 0
+            
+            print(f"Episode {episode:4d} | "
+                  f"Latency: {total_latency_ms:6.1f}ms | "
+                  f"Avg Latency: {avg_latency:6.1f}ms | "
+                  f"Best: {best_latency:6.1f}ms | "
+                  f"Reward: {total_reward:7.1f} | "
+                  f"Temp: {agent.temperature:.3f} | "
+                  f"TD: {avg_td_error:6.2f} | "
+                  f"Steps: {step_count}")
+        
+        # Save checkpoint
+    
+    # Final save
+    agent.save()
+    
+    print("=" * 80)
+    print("TRAINING COMPLETE")
+    print("=" * 80)
+    print(f"Best latency: {best_latency:.2f}ms at episode {best_episode}")
+    print(f"Final temperature: {agent.temperature:.3f}")
+    print("=" * 80)
+    
+    return agent, episode_latencies, episode_rewards
+
+
+def evaluate_agent(agent, num_episodes=100):
+    """Evaluate trained agent."""
+    print("\n" + "=" * 80)
+    print("EVALUATION: Pure Latency Minimization")
+    print("=" * 80)
+    
+    agent.is_test = True
+    latencies_ms = []
+    rewards = []
+    
+    for episode in range(num_episodes):
+        agent.start_episode()
+        state = create_initial_state(agent.simulator)
+        done = False
+        
+        while not done:
+            action, reward, latency_s, next_state, done = agent.step(state)
+            state = next_state
+        
+        latencies_ms.append(agent.current_episode_latency)
+        rewards.append(agent.current_episode_reward)
+    
+    # Statistics
+    mean_latency = np.mean(latencies_ms)
+    std_latency = np.std(latencies_ms)
+    min_latency = np.min(latencies_ms)
+    max_latency = np.max(latencies_ms)
+    p95_latency = np.percentile(latencies_ms, 95)
+    
+    print(f"Episodes: {num_episodes}")
+    print(f"Mean latency: {mean_latency:.2f}ms")
+    print(f"Std latency: {std_latency:.2f}ms")
+    print(f"Min latency: {min_latency:.2f}ms")
+    print(f"Max latency: {max_latency:.2f}ms")
+    print(f"95th percentile: {p95_latency:.2f}ms")
+    print(f"Mean reward: {np.mean(rewards):.2f}")
+    print("=" * 80)
+    
+    return latencies_ms, rewards
+
+
+# if __name__ == "__main__":
+    # Train
+    trained_agent, latencies, rewards = train_a2c_agent(profiling_data)
+    
+    # Evaluate
+    eval_latencies, eval_rewards = evaluate_agent(trained_agent)
+    
+    # Save results
+    np.savez("pure_latency_results.npz",
+             training_latencies=latencies,
+             training_rewards=rewards,
+             eval_latencies=eval_latencies,
+             eval_rewards=eval_rewards)
