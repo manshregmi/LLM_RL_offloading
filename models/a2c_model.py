@@ -60,9 +60,9 @@ class TabularActorCriticAgent:
         # self.epsilon_min = 0.05
         # EXPLORATION PARAMETERS
 
-        self.temperature = 0.01
+        self.temperature = 0.5
         self.temperature_min = 0.01
-        self.temperature_decay = 0.9  # decay
+        self.temperature_decay = 0.999  # decay
         self.temperature_boost = 0.1   # More reasonable boost
         self.epsilon_min = 0
 

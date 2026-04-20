@@ -8,6 +8,8 @@ from runner.run_a2c import aggregate_assignments_by_segment, evaluate_agent, plo
 from baselines.hurustic_baselines import run_scheduler 
 import matplotlib.pyplot  as plt
 
+from runner.run_dq import train_double_q_agent
+
 
 def run_baseline_comparison(profiling_data, episodes=100):
     """
@@ -178,6 +180,13 @@ if __name__ == "__main__":
         verbose=False,            # Print progress
     )
 
+
+    agent_dq, episode_latencies_dq, episode_rewards_dq = train_double_q_agent(
+        profiling_data=profiling_data,
+        episodes=TRAIN_EPISODES,
+        is_test=True,           # Training mode
+        verbose=False,            # Print progress)
+    )
     # latencies_ms, rewards, assignment_counts = evaluate_agent(agent, num_episodes=1000)
 
     plot_convergence_curve(episode_rewards)

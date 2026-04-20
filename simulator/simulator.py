@@ -96,17 +96,11 @@ def get_contention_data(contention_csv_path, n_yolos_inference, n_llama_inferenc
             "Bart contention": 0.0
         }
 
-    # return {
-    #     "Llama contention ": float(row.iloc[0]['Llama contention ']),
-    #     "Yolos contention": float(row.iloc[0]['Yolos contention']),
-    #     "Bart contention": float(row.iloc[0]['Bart contention'])
-    # }
-
     return {
-            "Llama contention ": 0.0,
-            "Yolos contention": 0.0,
-            "Bart contention": 0.0
-        }
+        "Llama contention ": float(row.iloc[0]['Llama contention']),
+        "Yolos contention": float(row.iloc[0]['Yolos contention']),
+        "Bart contention": float(row.iloc[0]['Bart contention'])
+    }
 
 # ==================== CLOUD EDGE SIMULATOR - PURE LATENCY ====================
 
@@ -124,9 +118,9 @@ class CloudEdgeSimulator:
         self.cumulative_time_seconds = 0.0
         self.episode_offset = 0.0
         self.episode_start_time = 0.0
-        self.i = random.randint(1, 8)
-        self.j = random.randint(1, 8)
-        self.k = random.randint(1, 8)
+        self.i = random.randint(0, 3)
+        self.j = random.randint(0, 3)
+        self.k = random.randint(0, 3)
 
         # Default bandwidth CSV path
 
@@ -156,15 +150,15 @@ class CloudEdgeSimulator:
 
     def get_current_bandwidth(self) -> float:
         """Get current bandwidth in MBps (Megabytes per second)"""
-        # if self.bandwidth_tracker:
-        #     query_time = float(self.cumulative_time_seconds + self.episode_offset)
-        #     bw_mbps = self.bandwidth_tracker.get_bandwidth_at_time(
-        #         query_time,
-        #         use_normalized=True
-        #     )
-        #     return float(bw_mbps / 8.0)  # Convert to MBps
+        if self.bandwidth_tracker:
+            query_time = float(self.cumulative_time_seconds + self.episode_offset)
+            bw_mbps = self.bandwidth_tracker.get_bandwidth_at_time(
+                query_time,
+                use_normalized=True
+            )
+            return float(bw_mbps / 8.0)  # Convert to MBps
         # return float(random.uniform(5, 100))
-        return 12
+        # return 100
 
     # ================= Action Space =================
 
@@ -206,22 +200,22 @@ class CloudEdgeSimulator:
         if (not isAllCloud):
             if (random.random() < 0.2):
                 self.i +=1
-                self.i = min(self.i, 8)
+                self.i = min(self.i, 3)
             elif (random.random() < 0.2):
                 self.i -=1
-                self.i = max(self.i, 1)
+                self.i = max(self.i, 0)
             if (random.random() < 0.2):
                 self.j +=1
-                self.j = min(self.j, 8)
+                self.j = min(self.j, 3)
             elif (random.random() < 0.2):
                 self.j -=1
-                self.j = max(self.j, 1)
+                self.j = max(self.j, 0)
             if (random.random() < 0.2):
                 self.k +=1
-                self.k = min(self.k, 8)
+                self.k = min(self.k, 3)
             elif (random.random() < 0.2):
                 self.k -=1
-                self.k = max(self.k, 1)
+                self.k = max(self.k, 0)
 
 
             random_llama_inference = self.i
@@ -229,9 +223,9 @@ class CloudEdgeSimulator:
             random_bart_inference = self.k
  
         else:
-            random_llama_inference = 8
-            random_yolos_inference = 8
-            random_bart_inference = 8
+            random_llama_inference = 3
+            random_yolos_inference = 3
+            random_bart_inference = 3
  
         contention_row = get_contention_data(
             contention_csv_path=self.contention_csv_path,
@@ -423,12 +417,9 @@ class CloudEdgeSimulator:
                 node_t_s = profiling.get_node_edge_time(layer, i) / 1000.0
                 edge_times.append(node_t_s)
 
-        # Edge computation time depends on layer type
-        # Layers 3 and 5 have parallel execution (max time), others sequential (sum)
-        if layer in [3, 5]:  # Parallel execution layers
-            edge_total_time_s = max(edge_times) if edge_times else 0.0
-        else:  # Sequential execution layers
-            edge_total_time_s = sum(edge_times)
+
+       
+        edge_total_time_s = sum(edge_times)
 
         # ========== 3. CLOUD WAITING/IDLE TIME ==========
         actual_idle_time_s = 0.0
