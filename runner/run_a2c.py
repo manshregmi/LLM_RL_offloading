@@ -76,9 +76,8 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         last_pipeline_contention.append(state[1])
         
         number_of_groups = grouping_RL_agent.train(bandwidth, average_last_pipeline_contention)
-        print("number of groups: ", number_of_groups)
-        print("bandwidth: ", bandwidth)
-        print("average_last_pipeline_contention: ", average_last_pipeline_contention)
+        # print("number of groups: ", number_of_groups)
+        # print("average_last_pipeline_contention: ", average_last_pipeline_contention)
 
         # Run episode
         action_array = []
@@ -94,11 +93,13 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
             state = next_state
             step_count += 1
         
-        print("action_array: ", action_array)
         average_last_pipeline_contention = np.mean(last_pipeline_contention) if last_pipeline_contention else 0.0
         last_pipeline_contention = []
-        asyncio.run(grouping_RL_agent.push_reward(rewards_ep))
-        grouping_RL_agent.save()  # Save grouping agent state after each episode
+        # asyncio.run(grouping_RL_agent.push_reward(rewards_ep))
+        # asyncio.run(grouping_RL_agent.get_reward())
+        asyncio.run(grouping_RL_agent.get_reward(rewards_ep))
+        if (episode % 100)== 0:
+            grouping_RL_agent.save()  # Save grouping agent state after each episode
         # End episode
         total_latency_ms, total_reward = agent.end_episode()
         episode_latencies.append(total_latency_ms)

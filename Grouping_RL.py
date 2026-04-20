@@ -49,7 +49,7 @@ NUM_STATES = NUM_BW_BINS * NUM_CONT_BINS
 
 # Bin edges — adjust these to match your simulator's real BW/contention ranges.
 BW_BIN_EDGES = np.linspace(1, 15.0, NUM_BW_BINS + 1)      # Mbps
-CONT_BIN_EDGES = np.linspace(0, 100.0, NUM_CONT_BINS + 1)  # ms
+CONT_BIN_EDGES = np.linspace(0, 20.0, NUM_CONT_BINS + 1)  # ms
 
 # --- Exploration ---
 # Entropy-style exploration: softmax temperature over policy logits.
@@ -261,7 +261,7 @@ class GroupingRL:
     # =====================================================================
     # ASYNC REWARD RECEIPT
     # =====================================================================
-    async def get_reward(self) -> bool:
+    async def get_reward(self, reward) -> bool:
         """
         Await the latency-based reward from the downstream offloading RL,
         then update the policy and value tables.
@@ -280,23 +280,23 @@ class GroupingRL:
             True  if the update succeeded.
             False if the queue entry was malformed.
         """
-        try:
-            payload = await self.reward_queue.get()
-        except asyncio.CancelledError:
-            return False
+        # try:
+        #     payload = await self.reward_queue.get()
+        # except asyncio.CancelledError:
+        #     return False
 
         try:
-            reward = float(payload["reward"])
-            state_key = payload["state_key"]          # tuple (bw_bin, ct_bin)
-            action_key = int(payload["action_key"])
-            done = bool(payload.get("done", False))
+            reward = reward
+            state_key = self.last_state_key       # tuple (bw_bin, ct_bin)
+            action_key = self.last_action_key
+            done = False
         except (KeyError, TypeError, ValueError) as e:
             print(f"[GroupingRL] Malformed reward payload: {e}")
             return False
 
         # Update tables
         self._update_tables(state_key, action_key, reward, done)
-        self.reward_queue.task_done()
+        # self.reward_queue.task_done()
         return True
 
     # =====================================================================
@@ -317,7 +317,6 @@ class GroupingRL:
             "action_key": self.last_action_key,
             "done": done,
         })
-
     # =====================================================================
     # UTILITIES
     # =====================================================================
