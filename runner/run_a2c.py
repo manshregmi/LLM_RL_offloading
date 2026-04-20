@@ -1,6 +1,8 @@
+import asyncio
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
+from Grouping_RL import GroupingRL
 from profiling.profiling_class import ProfilingData
 from models.a2c_model import TabularActorCriticAgent
 # Adjust import for your profiling data function as needed
@@ -31,6 +33,8 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         gamma=0.95,
         reward_scale=10.0,  # Scale reward magnitude
     )
+
+    grouping_RL_agent = GroupingRL()
     
     # Training parameters
     NUM_EPISODES = episodes
@@ -56,20 +60,33 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
     state = create_initial_state(agent.simulator)
     bandwidth = state[0]
     cloud_contention = state[1]
+    last_pipeline_contention = []
+    average_last_pipeline_contention = 0.0
     state = (bandwidth, cloud_contention, 0, None)  # Start at layer 0 with no previous assignment
-
     agent.load()  # Load existing model if available
+    grouping_RL_agent.load()  # Load grouping agent if it has a saved state
     for episode in range(NUM_EPISODES):
+        rewards_ep = 0
         state = (bandwidth, cloud_contention, 0, None)
         # Start episode
         agent.start_episode()
         done = False
         step_count = 0
         td_errors = []
+        last_pipeline_contention.append(state[1])
         
+        number_of_groups = grouping_RL_agent.train(bandwidth, average_last_pipeline_contention)
+        print("number of groups: ", number_of_groups)
+        print("bandwidth: ", bandwidth)
+        print("average_last_pipeline_contention: ", average_last_pipeline_contention)
+
         # Run episode
+        action_array = []
         while not done:
-            action, reward, latency_s, next_state, done = agent.step(state)
+            action, reward, latency_s, next_state, done = agent.step(state, numberOfGroups=number_of_groups)
+            action_array.append(action)
+            rewards_ep += reward
+            last_pipeline_contention.append(next_state[1])
             bandwidth = next_state[0]
             cloud_contention = next_state[1]
             td_error = agent.update(state, action, reward, next_state, done)
@@ -77,6 +94,11 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
             state = next_state
             step_count += 1
         
+        print("action_array: ", action_array)
+        average_last_pipeline_contention = np.mean(last_pipeline_contention) if last_pipeline_contention else 0.0
+        last_pipeline_contention = []
+        asyncio.run(grouping_RL_agent.push_reward(rewards_ep))
+        grouping_RL_agent.save()  # Save grouping agent state after each episode
         # End episode
         total_latency_ms, total_reward = agent.end_episode()
         episode_latencies.append(total_latency_ms)

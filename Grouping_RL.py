@@ -56,7 +56,7 @@ CONT_BIN_EDGES = np.linspace(0, 100.0, NUM_CONT_BINS + 1)  # ms
 # Higher temperature -> more random early; anneals down over training.
 TEMP_START = 2.0
 TEMP_END = 0.3
-TEMP_DECAY_STEPS = 3000
+TEMP_DECAY_STEPS = 32000
 
 # Epsilon-greedy floor: probability of picking a uniformly random action,
 # independent of the softmax policy. Provides an exploration safety net so the
@@ -302,7 +302,7 @@ class GroupingRL:
     # =====================================================================
     # HELPER: let the downstream RL push a reward
     # =====================================================================
-    async def push_reward(self, reward: float, state_key: int, action_key: int,
+    async def push_reward(self, reward: float,
                          done: bool = False):
         """
         Convenience method the downstream offloading RL can call to deliver
@@ -313,8 +313,8 @@ class GroupingRL:
         """
         await self.reward_queue.put({
             "reward": reward,
-            "state_key": state_key,
-            "action_key": action_key,
+            "state_key": self.last_state_key,
+            "action_key": self.last_action_key,
             "done": done,
         })
 

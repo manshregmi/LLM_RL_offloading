@@ -2,38 +2,21 @@ import numpy as np
 import random
 import pickle
 import os
+from itertools import product
 from profiling.profiling_class import ProfilingData
 from simulator.simulator import CloudEdgeSimulator
 
-
 class TabularActorCriticAgent:
     """
-    Tabular Actor–Critic for PURE LATENCY MINIMIZATION
+    Tabular Actor–Critic with GROUPING support.
     
-    GOAL: Minimize total inference latency (execution + communication time)
-    
-    STATE: [bandwidth, cloud_contention, current_layer, previous_assignment]
-        - bandwidth: Available network bandwidth (MBps)
-        - cloud_contention: Cloud server waiting time (ms)
-        - current_layer: Which DNN layer we're processing (0 to L-1)
-        - previous_assignment: Where previous layer's nodes ran (tuple of 0/1 values)
-    
-    ACTION: Binary assignment for each node in current layer
-        - 0: Execute on Edge device
-        - 1: Execute on Cloud server
-    
-    ALGORITHM: One-step Actor-Critic (online updates, no trajectory)
+    Groups are contiguous node sets. All nodes in a group share the same assignment.
+    The agent chooses a group‑level action (tuple of 0/1, length = num_groups),
+    then expands it to a per‑node action matrix.
     """
     
-    def __init__(
-        self,
-        profiling_data: ProfilingData,
-        is_test=False,
-        alpha_actor=0.02,      # Actor learning rate
-        alpha_critic=0.05,     # Critic learning rate  
-        gamma=0.95,            # Discount factor
-        reward_scale=10.0,     # Scale factor for rewards
-    ):
+    def __init__(self, profiling_data: ProfilingData, is_test=False,
+                 alpha_actor=0.02, alpha_critic=0.05, gamma=0.95, reward_scale=10.0):
         self.profiling = profiling_data
         self.is_test = is_test
         self.gamma = gamma
@@ -41,132 +24,157 @@ class TabularActorCriticAgent:
         self.alpha_critic = alpha_critic
         self.reward_scale = reward_scale
         
-        # TABLES
-        self.policy_table = {}   # (state_key, action_key) → preference score
-        self.value_table = {}    # state_key → state value V(s)
-        
-        # Simulator
+        self.policy_table = {}
+        self.value_table = {}
         self.simulator = CloudEdgeSimulator(profiling_data)
         
-        # DISCRETIZATION BINS
-        self.bandwidth_bins = np.linspace(1, 15, 15)      # Bandwidth: 1-15 MBps
-        self.cloudtime_bins = np.linspace(0, 100, 20)     # Cloud contention: 0-100 ms
+        # Discretization
+        self.bandwidth_bins = np.linspace(1, 15, 15)
+        self.cloudtime_bins = np.linspace(0, 100, 20)
         
-        # EXPLORATION PARAMETERS
-        # self.temperature = 1.0
-        # self.temperature_min = 0.025
-        # self.temperature_decay = 0.999
-        # self.temperature_boost = 1.35
-        # self.epsilon_min = 0.05
-        # EXPLORATION PARAMETERS
-
+        # Exploration
         self.temperature = 0.5
         self.temperature_min = 0.01
-        self.temperature_decay = 0.999  # decay
-        self.temperature_boost = 0.1   # More reasonable boost
+        self.temperature_decay = 0.999
+        self.temperature_boost = 1.5          # FIXED: boost >1 to increase exploration
         self.epsilon_min = 0
-
-        # PERFORMANCE TRACKING
+        
+        # Performance tracking
         self.best_episode_latency = float('inf')
         self.episodes_since_improvement = 0
         self.stagnant_limit = 10000
         self.total_episodes = 0
-        self.current_episode_latency = 0.0   # Total latency (ms)
-        self.current_episode_reward = 0.0    # Total reward
+        self.current_episode_latency = 0.0
+        self.current_episode_reward = 0.0
+        
+        # For grouping update
+        self.current_layer = None
+        self.current_num_groups = None
+        self.last_group_action_key = None
     
-    # =========================================================================
-    # STATE AND ACTION DISCRETIZATION
-    # =========================================================================
+    # -------------------------------------------------------------------------
+    # Helper: get number of nodes for a layer
+    # -------------------------------------------------------------------------
+    def _get_num_nodes(self, layer_idx):
+        """Return number of nodes in the given layer."""
+        # Assuming profiling_data.layers[layer_idx].nodes is a list
+        return self.profiling.get_num_nodes(layer_idx)
     
+    # -------------------------------------------------------------------------
+    # Group creation (contiguous, balanced sizes)
+    # -------------------------------------------------------------------------
+    def _create_groups(self, num_nodes, num_groups):
+        """
+        Split nodes into contiguous groups.
+        Returns a list of lists, e.g., [[0,1,2], [3,4], [5]] for 6 nodes, 3 groups.
+        """
+        if num_groups >= num_nodes:
+            # Each node its own group
+            return [[i] for i in range(num_nodes)]
+        base = num_nodes // num_groups
+        remainder = num_nodes % num_groups
+        groups = []
+        start = 0
+        for i in range(num_groups):
+            size = base + (1 if i < remainder else 0)
+            groups.append(list(range(start, start + size)))
+            start += size
+        return groups
+    
+    # -------------------------------------------------------------------------
+    # Action space for groups
+    # -------------------------------------------------------------------------
+    def _get_possible_group_actions(self, num_groups):
+        """Return all possible group assignment tuples (length = num_groups)."""
+        return list(product([0, 1], repeat=num_groups))
+    
+    def _expand_group_action(self, group_action, groups, num_nodes):
+        """
+        Convert group_action (tuple of 0/1) to node action matrix (nodes x 2).
+        Column 0 = node index, column 1 = assignment (0 edge, 1 cloud).
+        """
+        action_mat = np.zeros((num_nodes, 2), dtype=int)
+        action_mat[:, 0] = np.arange(num_nodes)
+        for g_idx, node_list in enumerate(groups):
+            assign = group_action[g_idx]
+            for node in node_list:
+                action_mat[node, 1] = assign
+        return action_mat
+    
+    # -------------------------------------------------------------------------
+    # State discretization (unchanged, but note previous_assignment is ignored)
+    # -------------------------------------------------------------------------
     def _discretize(self, value, bins):
-        """Convert continuous value to discrete bin center."""
         idx = np.digitize([value], bins, right=True)[0] - 1
         return float(bins[max(0, min(idx, len(bins) - 1))])
     
     def _state_to_key(self, state):
-        """
-        Convert state to hashable key.
-        
-        State format: [bandwidth, cloud_contention, layer, previous_assignment]
-        """
-        bw, ctime, layer, prev_assign = state
-        
+        bw, ctime, layer, _ = state
         return (
             self._discretize(float(bw), self.bandwidth_bins),
             self._discretize(float(ctime), self.cloudtime_bins),
             int(layer),
         )
     
-    def _action_to_key(self, action):
-        """Convert action matrix to hashable key."""
-        return tuple(int(x) for x in action[:, 1])
-    
-    # =========================================================================
-    # ACTION SPACE
-    # =========================================================================
-    
-    def _get_possible_actions(self, layer_idx):
-        """Get all possible actions for a layer using the simulator."""
-        return self.simulator.get_possible_actions(layer_idx)
-    
-    # =========================================================================
-    # ACTION SELECTION
-    # =========================================================================
-    
-    def choose_action(self, state):
-        """Select action using epsilon-greedy + softmax."""
-        layer = int(state[2])  # Current layer index
-        actions = self._get_possible_actions(layer)
+    # -------------------------------------------------------------------------
+    # Action selection with grouping
+    # -------------------------------------------------------------------------
+    def choose_action(self, state, num_groups):
+        """
+        Select a group assignment, then expand to node action matrix.
+        Returns the node‑level action matrix.
+        """
+        layer = int(state[2])
+        num_nodes = self._get_num_nodes(layer)
+        groups = self._create_groups(num_nodes, num_groups)
+        possible_actions = self._get_possible_group_actions(num_groups)
+        
         state_key = self._state_to_key(state)
         
-        # Forced exploration
-        if not self.is_test and random.random() < self.epsilon_min:
-            return random.choice(actions)
-        
-        # Get preference scores
+        # Compute preferences for each possible group action
         preferences = []
-        for action in actions:
-            action_key = self._action_to_key(action)
-            pref = self.policy_table.get((state_key, action_key), 0.0)
+        for group_act in possible_actions:
+            # Use the tuple itself as action key
+            pref = self.policy_table.get((state_key, group_act), 0.0)
             preferences.append(pref)
         
         preferences = np.array(preferences)
         
         # Softmax with temperature
-        scaled_prefs = preferences / max(self.temperature, 1e-6)
-        scaled_prefs -= np.max(scaled_prefs)
-        
-        probs = np.exp(scaled_prefs)
+        scaled = preferences / max(self.temperature, 1e-6)
+        scaled -= np.max(scaled)
+        probs = np.exp(scaled)
         probs /= np.sum(probs)
         
-        # Test mode: greedy
         if self.is_test:
-            best_idx = int(np.argmax(probs))
-            return actions[best_idx]
+            idx = int(np.argmax(probs))
+        else:
+            # epsilon-greedy floor (if epsilon_min > 0)
+            if random.random() < self.epsilon_min:
+                idx = random.randrange(len(possible_actions))
+            else:
+                idx = np.random.choice(len(possible_actions), p=probs)
         
-        # Training mode: sample
-        chosen_idx = np.random.choice(len(actions), p=probs)
-        return actions[chosen_idx]
+        chosen_group_action = possible_actions[idx]
+        
+        # Expand to node matrix
+        action_matrix = self._expand_group_action(chosen_group_action, groups, num_nodes)
+        
+        # Store for later update
+        self.last_group_action_key = chosen_group_action
+        self.current_layer = layer
+        self.current_num_groups = num_groups
+        
+        return action_matrix
     
-    # =========================================================================
-    # ENVIRONMENT INTERACTION
-    # =========================================================================
-    
-    def step(self, current_state):
-        """
-        Execute one step in the environment.
+    # -------------------------------------------------------------------------
+    # Environment step (now accepts numberOfGroups)
+    # -------------------------------------------------------------------------
+    def step(self, current_state, numberOfGroups=399):
+        """Execute one step, using grouping."""
+        # Choose action with given number of groups
+        action = self.choose_action(current_state, numberOfGroups)
         
-        Returns:
-            action: Chosen action
-            reward: Immediate reward
-            latency: Raw latency value (seconds)
-            next_state: Next state
-            done: Whether episode is complete
-        """
-        # Step 1: Choose action
-        action = self.choose_action(current_state)
-        
-        # Step 2: Get cloud waiting time for next layer
         layer = int(current_state[2])
         next_layer = min(layer + 1, len(self.profiling.layers) - 1)
         
@@ -176,133 +184,91 @@ class TabularActorCriticAgent:
             isAllCloud=False,
         )
         
-        # Step 3: Compute latency
         latency_s = self.simulator.compute_latency(
             current_state=current_state,
             current_action=action,
             cloud_pending_ms=cloud_waiting_time,
         )
         
-        # Step 4: Calculate reward (pure latency minimization)
-        reward = self.simulator.calculate_latency_reward(
-            latency_s, 
-            scale_factor=self.reward_scale
-        )
+        reward = self.simulator.calculate_latency_reward(latency_s, scale_factor=self.reward_scale)
         
-        # Step 5: Get next state
         next_state, done = self.simulator.get_next_state(
             current_state=current_state,
             action=action,
             new_cloud_pending=cloud_waiting_time,
         )
         
-        # Step 6: Track metrics
         latency_ms = latency_s * 1000
         self.current_episode_latency += latency_ms
         self.current_episode_reward += reward
         
         return action, reward, latency_s, next_state, done
     
-    # =========================================================================
-    # ONLINE UPDATE
-    # =========================================================================
-    
+    # -------------------------------------------------------------------------
+    # Update (uses stored group action key)
+    # -------------------------------------------------------------------------
     def update(self, state, action, reward, next_state, done):
-        """
-        One-step TD update for Actor-Critic.
-        """
+        """One-step TD update for Actor-Critic using group action key."""
         state_key = self._state_to_key(state)
-        action_key = self._action_to_key(action)
+        action_key = self.last_group_action_key   # tuple of group assignments
         next_state_key = self._state_to_key(next_state)
         
-        # Current value
         V_current = self.value_table.get(state_key, 0.0)
-        
-        # TD Target
         if done:
             target = reward
         else:
             V_next = self.value_table.get(next_state_key, 0.0)
             target = reward + self.gamma * V_next
         
-        # TD Error
-        td_error = target - V_current
-        td_error = np.clip(td_error, -10000.0, 10000.0)
+        td_error = np.clip(target - V_current, -10000.0, 10000.0)
         
-        # Update Critic
+        # Critic update
         self.value_table[state_key] = V_current + self.alpha_critic * td_error
         
-        # Update Actor
+        # Actor update
         old_pref = self.policy_table.get((state_key, action_key), 0.0)
         new_pref = old_pref + self.alpha_actor * td_error
         self.policy_table[(state_key, action_key)] = np.clip(new_pref, -500.0, 500.0)
         
         return td_error
     
-    # =========================================================================
-    # EPISODE MANAGEMENT
-    # =========================================================================
-    
+    # -------------------------------------------------------------------------
+    # Episode management (unchanged)
+    # -------------------------------------------------------------------------
     def start_episode(self):
-        """Reset episode tracking and simulator time."""
         self.current_episode_latency = 0.0
         self.current_episode_reward = 0.0
         self.simulator.reset_episode_time()
     
     def end_episode(self):
-        """
-        Update exploration parameters based on performance.
-        
-        Returns:
-            tuple: (total_latency_ms, total_reward)
-        """
         total_latency = self.current_episode_latency
         total_reward = self.current_episode_reward
-        
         self.total_episodes += 1
         
-        # Check for improvement (lower latency = better)
         if total_latency < self.best_episode_latency:
             self.best_episode_latency = total_latency
             self.episodes_since_improvement = 0
-            
-            # Reduce exploration when improving
-            self.temperature = max(
-                self.temperature_min,
-                self.temperature * 0.995
-            )
+            self.temperature = max(self.temperature_min, self.temperature * 0.995)
         else:
             self.episodes_since_improvement += 1
-            
-            # Boost exploration if stagnant
             if self.episodes_since_improvement >= self.stagnant_limit:
-                self.temperature = min(
-                    2.0,
-                    self.temperature * self.temperature_boost
-                )
+                self.temperature = min(2.0, self.temperature * self.temperature_boost)
                 self.episodes_since_improvement = 0
                 print(f"🔥 Temperature boosted to {self.temperature:.3f}")
             else:
-                # Slight decay
-                self.temperature = max(
-                    self.temperature_min,
-                    self.temperature * self.temperature_decay
-                )
+                self.temperature = max(self.temperature_min, self.temperature * self.temperature_decay)
         
         return total_latency, total_reward
     
-    # =========================================================================
-    # PERSISTENCE
-    # =========================================================================
-    
+    # -------------------------------------------------------------------------
+    # Persistence
+    # -------------------------------------------------------------------------
     def save(self, file="a2c_tables.pkl"):
-        """Save learned tables."""
         with open(file, "wb") as f:
             pickle.dump((self.policy_table, self.value_table), f)
         print(f"💾 Agent saved to {file}")
     
     def load(self, file="a2c_tables.pkl"):
-        """Load learned tables."""
         if os.path.exists(file):
             with open(file, "rb") as f:
                 self.policy_table, self.value_table = pickle.load(f)
