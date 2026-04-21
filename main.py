@@ -159,7 +159,7 @@ if __name__ == "__main__":
     print("=" * 80)
     
     # Define number of episodes for training and baselines
-    TRAIN_EPISODES = 100
+    TRAIN_EPISODES = 5000
     BASELINE_EPISODES = 1
     
     # # Run baseline schedulers
@@ -173,20 +173,20 @@ if __name__ == "__main__":
     print("TRAINING A2C AGENT")
     print("=" * 80)
     
-    agent, episode_latencies, episode_rewards = train_a2c_agent(
-        profiling_data=profiling_data,
-        episodes=TRAIN_EPISODES,
-        is_test=True,           # Training mode
-        verbose=False,            # Print progress
-    )
-
-
-    # agent_dq, episode_latencies_dq, episode_rewards_dq = train_double_q_agent(
+    # agent, episode_latencies, episode_rewards = train_a2c_agent(
     #     profiling_data=profiling_data,
     #     episodes=TRAIN_EPISODES,
     #     is_test=True,           # Training mode
-    #     verbose=False,            # Print progress)
+    #     verbose=False,            # Print progress
     # )
+
+
+    agent_dq, episode_latencies_dq, episode_rewards_dq = train_double_q_agent(
+        profiling_data=profiling_data,
+        episodes=TRAIN_EPISODES,
+        is_test=True,           # Training mode
+        verbose=False,            # Print progress)
+    )
     # latencies_ms, rewards, assignment_counts = evaluate_agent(agent, num_episodes=1000)
 
     # plot_convergence_curve(episode_rewards)
@@ -199,16 +199,16 @@ if __name__ == "__main__":
 
 
     
-    # Calculate average A2C performance (last 100 episodes for stable comparison)
-    a2c_avg_latency = np.mean(episode_latencies[-100:])
-    a2c_avg_reward = np.mean(episode_rewards[-100:])
+    # # Calculate average A2C performance (last 100 episodes for stable comparison)
+    # a2c_avg_latency = np.mean(episode_latencies[-100:])
+    # a2c_avg_reward = np.mean(episode_rewards[-100:])
     
-    print("\n" + "=" * 80)
-    print(f"A2C FINAL PERFORMANCE (last 100 episodes)")
-    print("=" * 80)
-    print(f"Average Latency: {a2c_avg_latency:.2f} ms")
-    print(f"Average Reward: {a2c_avg_reward:.2f}")
-    print("=" * 80)
+    # print("\n" + "=" * 80)
+    # print(f"A2C FINAL PERFORMANCE (last 100 episodes)")
+    # print("=" * 80)
+    # print(f"Average Latency: {a2c_avg_latency:.2f} ms")
+    # print(f"Average Reward: {a2c_avg_reward:.2f}")
+    # print("=" * 80)
     
     # # Compare A2C with baselines
     # compare_with_a2c(a2c_avg_latency, a2c_avg_reward, baseline_results)
