@@ -159,14 +159,14 @@ if __name__ == "__main__":
     print("=" * 80)
     
     # Define number of episodes for training and baselines
-    TRAIN_EPISODES = 1500
+    TRAIN_EPISODES = 100
     BASELINE_EPISODES = 1
     
-    # Run baseline schedulers
-    baseline_results = run_baseline_comparison(
-        profiling_data=profiling_data,
-        episodes=BASELINE_EPISODES
-    )
+    # # Run baseline schedulers
+    # baseline_results = run_baseline_comparison(
+    #     profiling_data=profiling_data,
+    #     episodes=BASELINE_EPISODES
+    # )
     
     # Train A2C agent
     print("\n" + "=" * 80)
@@ -181,15 +181,15 @@ if __name__ == "__main__":
     )
 
 
-    agent_dq, episode_latencies_dq, episode_rewards_dq = train_double_q_agent(
-        profiling_data=profiling_data,
-        episodes=TRAIN_EPISODES,
-        is_test=True,           # Training mode
-        verbose=False,            # Print progress)
-    )
+    # agent_dq, episode_latencies_dq, episode_rewards_dq = train_double_q_agent(
+    #     profiling_data=profiling_data,
+    #     episodes=TRAIN_EPISODES,
+    #     is_test=True,           # Training mode
+    #     verbose=False,            # Print progress)
+    # )
     # latencies_ms, rewards, assignment_counts = evaluate_agent(agent, num_episodes=1000)
 
-    plot_convergence_curve(episode_rewards)
+    # plot_convergence_curve(episode_rewards)
 
     # segments = aggregate_assignments_by_segment(assignment_counts)
 
@@ -210,53 +210,53 @@ if __name__ == "__main__":
     print(f"Average Reward: {a2c_avg_reward:.2f}")
     print("=" * 80)
     
-    # Compare A2C with baselines
-    compare_with_a2c(a2c_avg_latency, a2c_avg_reward, baseline_results)
+    # # Compare A2C with baselines
+    # compare_with_a2c(a2c_avg_latency, a2c_avg_reward, baseline_results)
     
-    # Optional: Plot comparison
-    try:
-        import matplotlib.pyplot as plt
+    # # Optional: Plot comparison
+    # try:
+    #     import matplotlib.pyplot as plt
         
-        plt.figure(figsize=(12, 5))
+    #     plt.figure(figsize=(12, 5))
         
-        # Latency comparison
-        plt.subplot(1, 2, 1)
-        schedulers = list(baseline_results.keys()) + ['A2C']
-        latencies = [baseline_results[s]['latency_ms'] for s in baseline_results.keys()] + [a2c_avg_latency]
-        colors = ['red', 'blue', 'green', 'purple']
+    #     # Latency comparison
+    #     plt.subplot(1, 2, 1)
+    #     schedulers = list(baseline_results.keys()) + ['A2C']
+    #     latencies = [baseline_results[s]['latency_ms'] for s in baseline_results.keys()] + [a2c_avg_latency]
+    #     colors = ['red', 'blue', 'green', 'purple']
         
-        bars = plt.bar(schedulers, latencies, color=colors)
-        plt.ylabel('Latency (ms)')
-        plt.title('Latency Comparison: A2C vs Baselines')
-        plt.xticks(rotation=45)
+    #     bars = plt.bar(schedulers, latencies, color=colors)
+    #     plt.ylabel('Latency (ms)')
+    #     plt.title('Latency Comparison: A2C vs Baselines')
+    #     plt.xticks(rotation=45)
         
-        # Add value labels on bars
-        for bar, latency in zip(bars, latencies):
-            plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 5,
-                    f'{latency:.1f}', ha='center', va='bottom')
+    #     # Add value labels on bars
+    #     for bar, latency in zip(bars, latencies):
+    #         plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 5,
+    #                 f'{latency:.1f}', ha='center', va='bottom')
         
-        # Reward comparison
-        plt.subplot(1, 2, 2)
-        rewards = [baseline_results[s]['reward'] for s in baseline_results.keys()] + [a2c_avg_reward]
+    #     # Reward comparison
+    #     plt.subplot(1, 2, 2)
+    #     rewards = [baseline_results[s]['reward'] for s in baseline_results.keys()] + [a2c_avg_reward]
         
-        bars = plt.bar(schedulers, rewards, color=colors)
-        plt.ylabel('Reward')
-        plt.title('Reward Comparison: A2C vs Baselines')
-        plt.xticks(rotation=45)
+    #     bars = plt.bar(schedulers, rewards, color=colors)
+    #     plt.ylabel('Reward')
+    #     plt.title('Reward Comparison: A2C vs Baselines')
+    #     plt.xticks(rotation=45)
         
-        # Add value labels on bars
-        for bar, reward in zip(bars, rewards):
-            plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 5,
-                    f'{reward:.1f}', ha='center', va='bottom')
+    #     # Add value labels on bars
+    #     for bar, reward in zip(bars, rewards):
+    #         plt.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 5,
+    #                 f'{reward:.1f}', ha='center', va='bottom')
         
-        plt.tight_layout()
-        plt.savefig('a2c_vs_baselines_comparison.png', dpi=600)
-        plt.show()
+    #     plt.tight_layout()
+    #     plt.savefig('a2c_vs_baselines_comparison.png', dpi=600)
+    #     plt.show()
         
-    except ImportError:
-        print("Matplotlib not available for plotting")
+    # except ImportError:
+    #     print("Matplotlib not available for plotting")
     
-    print("\n✅ Experiment completed!")
+    # print("\n✅ Experiment completed!")
     
-    # Optional: Debug a single episode
-    # debug_single_episode(profiling_data)
+    # # Optional: Debug a single episode
+    # # debug_single_episode(profiling_data)
