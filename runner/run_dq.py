@@ -65,6 +65,7 @@ def train_double_q_agent(profiling_data: ProfilingData,
 
     episode_overhead_time = []
     average_step_overhead_times = []
+    last_pipeline_contention = []
 
     for episode in range(NUM_EPISODES):
         # Initial state
@@ -79,20 +80,19 @@ def train_double_q_agent(profiling_data: ProfilingData,
         step_overhead_times = []
 
         # Keep track of cloud contention for grouping agent
-        last_pipeline_contention = [state[1]]
+        last_pipeline_contention.append(cloud_contention)
 
         # Decide number of groups for this episode
         number_of_groups = grouping_RL_agent.train(
             bandwidth,
             np.mean(last_pipeline_contention) if last_pipeline_contention else 0.0
         )
+        last_pipeline_contention = []  # reset for this episode
 
         while not done:
-            start_step = time.perf_counter()
-            action, reward, latency_s, next_state, done = agent.step(
+            action, reward, latency_s, next_state, done, step_time = agent.step(
                 state, num_groups=number_of_groups
             )
-            step_time = time.perf_counter() - start_step
             step_overhead_times.append(step_time)
 
             # Update tracking

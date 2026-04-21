@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import random
 import pickle
@@ -202,7 +203,9 @@ class TabularDoubleQLearningAgent:
             done: Whether episode is complete
         """
         # Step 1: Choose action (with optional grouping)
+        start_time = time.time()
         action = self.choose_action(current_state, num_groups=num_groups)
+        overhead_time = time.time() - start_time
         
         # Step 2: Get cloud waiting time for next layer
         layer = int(current_state[2])
@@ -235,7 +238,7 @@ class TabularDoubleQLearningAgent:
         self.current_episode_latency += latency_ms
         self.current_episode_reward += reward
         
-        return action, reward, latency_s, next_state, done
+        return action, reward, latency_s, next_state, done, overhead_time
     
     # =========================================================================
     # DOUBLE Q-LEARNING UPDATE
