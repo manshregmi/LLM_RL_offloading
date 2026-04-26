@@ -21,7 +21,7 @@ def create_initial_state(simulator):
     
     return (bandwidth, cloud_contention, layer, previous_assignment)
 
-def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False, verbose=True): 
+def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False, verbose=True, total_pipelines=1): 
     """Main training loop."""
     
     # Create agent
@@ -32,6 +32,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         alpha_critic=0.05,
         gamma=0.95,
         reward_scale=10.0,  # Scale reward magnitude
+        total_pipelines=total_pipelines
     )
 
     grouping_RL_agent = GroupingRL()
@@ -148,7 +149,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
     print(f"Final temperature: {agent.temperature:.3f}")
     print("=" * 80)
     
-    return agent, episode_latencies, episode_rewards
+    return agent, episode_latencies, episode_rewards, np.mean(episode_overhead_time)
 
 def evaluate_agent(agent, num_episodes=100):
     """

@@ -20,6 +20,7 @@ class TabularActorCriticAgent:
         alpha_critic=0.05,
         gamma=0.95,
         reward_scale=10.0,
+        total_pipelines=1
     ):
         self.profiling = profiling_data
         self.is_test = is_test
@@ -30,7 +31,7 @@ class TabularActorCriticAgent:
         
         self.policy_table = {}
         self.value_table = {}
-        self.simulator = CloudEdgeSimulator(profiling_data)
+        self.simulator = CloudEdgeSimulator(profiling_data,total_pipeline=total_pipelines)
         
         self.bandwidth_bins = np.linspace(1, 15, 15)
         self.cloudtime_bins = np.linspace(0, 100, 20)

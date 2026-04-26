@@ -83,12 +83,17 @@ class GroupingRL:
                  gamma=GAMMA,
                  alpha_policy=ALPHA_POLICY,
                  alpha_value=ALPHA_VALUE,
-                 epsilon_min=EPSILON_MIN):
+                 epsilon_min=EPSILON_MIN,
+                 total_pipelines=1
+                 ):
+
+        self.K_MIN = 3 * total_pipelines
+        self.K_MAX = 399 * total_pipelines
+        self.num_actions = self.K_MAX - self.K_MIN + 1
 
         self.num_bw_bins = num_bw_bins
         self.num_cont_bins = num_cont_bins
         self.num_states = num_bw_bins * num_cont_bins
-        self.num_actions = num_actions
 
         self.gamma = gamma
         self.alpha_policy = alpha_policy

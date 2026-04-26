@@ -3,6 +3,9 @@ Main execution script for Pure Latency Minimization with Actor-Critic and Baseli
 """
 
 import numpy as np
+import pandas as pd
+import os
+from profiling.cascade_profiling_data import cascade_profiling
 from profiling.initialize_agx_profiling import get_LLM_profiling_data
 from runner.run_a2c import aggregate_assignments_by_segment, evaluate_agent, plot_assignment_percentages, train_a2c_agent
 from baselines.hurustic_baselines import run_scheduler 
@@ -149,44 +152,59 @@ if __name__ == "__main__":
     print("=" * 80)
     print("LOADING PROFILING DATA")
     print("=" * 80)
-    
     profiling_data = get_LLM_profiling_data()
-    print(f"✅ Loaded profiling data")
-    print(f"   Number of layers: {len(profiling_data.layers)}")
-    print(f"   Number of edge devices: {profiling_data.numberOfEdgeDevice}")
-    print(f"   RTT: {profiling_data.rtt}ms")
-    print(f"   Deadline (info only): {profiling_data.deadline}ms")
-    print("=" * 80)
-    
-    # Define number of episodes for training and baselines
-    TRAIN_EPISODES = 100
-    BASELINE_EPISODES = 1
-    
-    # # Run baseline schedulers
-    # baseline_results = run_baseline_comparison(
-    #     profiling_data=profiling_data,
-    #     episodes=BASELINE_EPISODES
-    # )
-    
-    # Train A2C agent
-    print("\n" + "=" * 80)
-    print("TRAINING A2C AGENT")
-    print("=" * 80)
-    
-    # agent, episode_latencies, episode_rewards = train_a2c_agent(
+    pipleline_overhead_time = []
+
+    for n in range(1,10):
+        try:
+            os.remove("a2c_tables.pkl")
+        except FileNotFoundError:
+            pass   # Ignore if file doesn’t exist (like rm -f)
+        try:
+            os.remove("grouping_rl_tables.pkl")
+        except FileNotFoundError:
+            pass   # Ignore if file doesn’t exist (like rm -f)
+        
+        cascaded_profiling_data = cascade_profiling(profiling_data,n=n)  # Create 3 copies for pipelining
+        print(f"✅ Loaded profiling data")
+        print(f"   Number of layers: {len(profiling_data.layers)}")
+        print(f"   Number of edge devices: {profiling_data.numberOfEdgeDevice}")
+        print(f"   RTT: {profiling_data.rtt}ms")
+        print(f"   Deadline (info only): {profiling_data.deadline}ms")
+        print("=" * 80)
+        
+        # Define number of episodes for training and baselines
+        TRAIN_EPISODES = 1000
+        BASELINE_EPISODES = 1
+        
+        # # Run baseline schedulers
+        # baseline_results = run_baseline_comparison(
+        #     profiling_data=profiling_data,
+        #     episodes=BASELINE_EPISODES
+        # )
+        
+        # Train A2C agent
+        print("\n" + "=" * 80)
+        print("TRAINING A2C AGENT")
+        print("=" * 80)
+        
+        agent, episode_latencies, episode_rewards, overhead_time = train_a2c_agent(
+            profiling_data=cascaded_profiling_data,
+            episodes=TRAIN_EPISODES,
+            is_test=True,           # Training mode
+            verbose=False,            # Print progress
+            total_pipelines=n
+        )
+        pipleline_overhead_time.append(overhead_time)
+        print(f"Pipeline overhead time for {n} pipelines: {overhead_time:.2f} ms")
+    pd.DataFrame(pipleline_overhead_time).to_csv('pipeline_overhead.csv', index=False, header=False)
+
+    # agent_dq, episode_latencies_dq, episode_rewards_dq = train_double_q_agent(
     #     profiling_data=profiling_data,
     #     episodes=TRAIN_EPISODES,
     #     is_test=True,           # Training mode
-    #     verbose=False,            # Print progress
+    #     verbose=False,            # Print progress)
     # )
-
-
-    agent_dq, episode_latencies_dq, episode_rewards_dq = train_double_q_agent(
-        profiling_data=profiling_data,
-        episodes=TRAIN_EPISODES,
-        is_test=True,           # Training mode
-        verbose=False,            # Print progress)
-    )
     # latencies_ms, rewards, assignment_counts = evaluate_agent(agent, num_episodes=1000)
 
     # plot_convergence_curve(episode_rewards)

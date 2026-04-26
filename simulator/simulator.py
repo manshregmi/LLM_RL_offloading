@@ -111,7 +111,7 @@ class CloudEdgeSimulator:
     - Only goal: minimize total inference latency
     """
     
-    def __init__(self, profiling_data: ProfilingData, bandwidth_csv_path: Optional[str] = None):
+    def __init__(self, profiling_data: ProfilingData, bandwidth_csv_path: Optional[str] = None, total_pipeline=1):
 
         self.profiling = profiling_data
         self.bandwidth_tracker = None
@@ -122,6 +122,7 @@ class CloudEdgeSimulator:
         self.j = random.randint(0, 3)
         self.k = random.randint(0, 3)
 
+        self.total_pipeline = total_pipeline
         # Default bandwidth CSV path
 
 
@@ -239,12 +240,13 @@ class CloudEdgeSimulator:
         bart_cont  = contention_row["Bart contention"]
  
         contention = 0
- 
-        if layer <= 1:
+
+        relative_layer = layer % 400
+        if relative_layer <= 1:
             contention = yolos_cont
-        elif 2 < layer < 300:
+        elif 2 < relative_layer < 300:
             contention = llama_cont
-        elif 300 < layer < 400:
+        elif 300 < relative_layer < 400:
             contention = bart_cont
  
         new_cloud_pending = contention
@@ -292,29 +294,29 @@ class CloudEdgeSimulator:
        
         # Check if this was the last layer
         if layer + 1 < len(self.profiling.layers):
-            terminal = False
-            if 20 < layer < 100:
-                if np.random.rand() < 0.01:
-                    next_layer = 100
-                else:
-                    next_layer = layer + 1
+            # terminal = False
+            # if 20 < layer < 100:
+            #     if np.random.rand() < 0.01:
+            #         next_layer = 100
+            #     else:
+            #         next_layer = layer + 1
  
-            elif 180 < layer < 300:
-                if np.random.rand() < 0.01:
-                    next_layer = 300
-                else:
-                    next_layer = layer + 1
+            # elif 180 < layer < 300:
+            #     if np.random.rand() < 0.01:
+            #         next_layer = 300
+            #     else:
+            #         next_layer = layer + 1
  
-            elif 350 < layer < 400:
-                if np.random.rand() < 0.01:
-                    next_layer = 400
-                    terminal = True
-                else:
-                  next_layer = layer + 1
+            # elif 350 < layer < 400:
+            #     if np.random.rand() < 0.01:
+            #         next_layer = 400
+            #         terminal = True
+            #     else:
+            #       next_layer = layer + 1
  
-            else:
+            # else:
                 next_layer = layer + 1
- 
+                terminal = False
         else:
             next_layer = layer
             terminal = True
