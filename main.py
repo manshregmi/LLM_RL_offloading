@@ -155,7 +155,7 @@ if __name__ == "__main__":
     profiling_data = get_LLM_profiling_data()
     pipleline_overhead_time = []
 
-    for n in range(1,10):
+    for n in range(1,10,2):
         try:
             os.remove("a2c_tables.pkl")
         except FileNotFoundError:
@@ -174,7 +174,7 @@ if __name__ == "__main__":
         print("=" * 80)
         
         # Define number of episodes for training and baselines
-        TRAIN_EPISODES = 100
+        TRAIN_EPISODES = 1000
         BASELINE_EPISODES = 1
         
         # # Run baseline schedulers

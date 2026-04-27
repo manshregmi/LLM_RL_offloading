@@ -97,7 +97,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
             td_errors.append(td_error)
             state = next_state
             step_count += 1
-        episode_overhead_time.append(np.sum(step_overhead_time))
+        episode_overhead_time.append(np.sum(step_overhead_time)*1000)
         average_step_overhead_times.append(np.mean(step_overhead_time))
 
         average_last_pipeline_contention = np.mean(last_pipeline_contention) if last_pipeline_contention else 0.0
@@ -148,8 +148,8 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
     print(f"Best latency: {best_latency:.2f}ms at episode {best_episode}")
     print(f"Final temperature: {agent.temperature:.3f}")
     print("=" * 80)
-    
-    return agent, episode_latencies, episode_rewards, np.mean(episode_overhead_time)
+
+    return agent, episode_latencies, episode_rewards, np.mean(episode_overhead_time[100:])
 
 def evaluate_agent(agent, num_episodes=100):
     """
