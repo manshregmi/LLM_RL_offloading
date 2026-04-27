@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import random
 import pickle
@@ -65,6 +66,9 @@ class TabularDoubleQLearningAgent:
         self.total_episodes = 0
         self.current_episode_latency = 0.0
         self.current_episode_reward = 0.0
+        
+        # Group action cache (cleared each episode)
+        self.group_range_assignments = {}   # key: (num_groups, chunk_idx) → action
     
     # =========================================================================
     # STATE AND ACTION DISCRETIZATION
@@ -85,26 +89,19 @@ class TabularDoubleQLearningAgent:
             prev_key = None
         else:
             # Extract the assignment column (0/1) from prev_assign
-            # prev_assign could be a numpy array (shape nodes x 2) or a tuple/list of pairs
             if hasattr(prev_assign, 'shape') and len(prev_assign.shape) == 2:
-                # numpy array: take second column
                 assignments = prev_assign[:, 1]
             else:
-                # Assume iterable of pairs (node_idx, assignment) or just assignments
-                # Try to get second element of each item
                 try:
                     assignments = [item[1] for item in prev_assign]
                 except (TypeError, IndexError):
-                    # If it's already a flat list of assignments, use directly
                     assignments = prev_assign
             prev_key = tuple(int(x) for x in assignments)
         
         return (bw_bin, ctime_bin, int(layer), prev_key)
     
-    
     def _action_to_key(self, action):
         """Convert action matrix to hashable key."""
-        # action is a numpy array with shape (num_nodes, 2), we take the assignment column
         return tuple(int(x) for x in action[:, 1])
     
     # =========================================================================
@@ -114,6 +111,14 @@ class TabularDoubleQLearningAgent:
     def _get_possible_actions(self, layer_idx):
         """Get all possible actions for a layer using the simulator."""
         return self.simulator.get_possible_actions(layer_idx)
+    
+    # =========================================================================
+    # GROUP CACHING HELPERS
+    # =========================================================================
+    def _get_chunk_index(self, layer, num_groups):
+        total_layers = len(self.profiling.layers)
+        layers_per_chunk = max(1, total_layers // num_groups)
+        return layer // layers_per_chunk
     
     # =========================================================================
     # Q-VALUE ACCESS (with default 0.0)
@@ -134,43 +139,61 @@ class TabularDoubleQLearningAgent:
         return (q1 + q2) / 2.0
     
     # =========================================================================
-    # ACTION SELECTION (ε-greedy on average Q)
+    # ACTION SELECTION (ε-greedy on average Q) with optional group caching
     # =========================================================================
     
-    def choose_action(self, state):
-        """Select action using ε-greedy policy based on average Q-values."""
-        layer = int(state[2])   # Current layer index
+    def choose_action(self, state, num_groups=None):
+        """
+        Select action using ε-greedy policy based on average Q-values.
+        If num_groups is provided, actions are cached per group to reduce overhead.
+        """
+        layer = int(state[2])
+        
+        # Group caching: if we already have an action for this group, reuse it
+        if num_groups is not None and num_groups > 0:
+            chunk_idx = self._get_chunk_index(layer, num_groups)
+            cache_key = (num_groups, chunk_idx)
+            if cache_key in self.group_range_assignments:
+                return self.group_range_assignments[cache_key]
+        
         actions = self._get_possible_actions(layer)
         state_key = self._state_to_key(state)
         
         # Exploration: random action
         if not self.is_test and random.random() < self.epsilon:
-            return random.choice(actions)
+            chosen_action = random.choice(actions)
+        else:
+            # Exploitation: choose action maximizing average Q
+            best_action = None
+            best_value = -float('inf')
+            for action in actions:
+                action_key = self._action_to_key(action)
+                q_avg = self._get_q_avg(state_key, action_key)
+                if q_avg > best_value:
+                    best_value = q_avg
+                    best_action = action
+            # Fallback
+            if best_action is None:
+                best_action = actions[0]
+            chosen_action = best_action
         
-        # Exploitation: choose action maximizing average Q
-        best_action = None
-        best_value = -float('inf')
+        # Cache the chosen action for this group (if grouping is active)
+        if num_groups is not None and num_groups > 0:
+            self.group_range_assignments[cache_key] = chosen_action
         
-        for action in actions:
-            action_key = self._action_to_key(action)
-            q_avg = self._get_q_avg(state_key, action_key)
-            if q_avg > best_value:
-                best_value = q_avg
-                best_action = action
-        
-        # If all actions have equal value (e.g., all zero), pick first
-        if best_action is None:
-            best_action = actions[0]
-        
-        return best_action
+        return chosen_action
     
     # =========================================================================
     # ENVIRONMENT INTERACTION
     # =========================================================================
     
-    def step(self, current_state):
+    def step(self, current_state, num_groups=None):
         """
         Execute one step in the environment.
+        
+        Args:
+            current_state: current state
+            num_groups: if provided, enables action caching for groups of layers
         
         Returns:
             action: Chosen action
@@ -179,10 +202,12 @@ class TabularDoubleQLearningAgent:
             next_state: Next state
             done: Whether episode is complete
         """
-        # Step 1: Choose action
-        action = self.choose_action(current_state)
+        # Step 1: Choose action (with optional grouping)
+        start_time = time.time()
+        action = self.choose_action(current_state, num_groups=num_groups)
+        overhead_time = time.time() - start_time
         
-        # Step 2: Get cloud waiting time for next layer (required by simulator)
+        # Step 2: Get cloud waiting time for next layer
         layer = int(current_state[2])
         next_layer = min(layer + 1, len(self.profiling.layers) - 1)
         
@@ -199,11 +224,7 @@ class TabularDoubleQLearningAgent:
             cloud_pending_ms=cloud_waiting_time,
         )
         
-        # Step 4: Calculate reward (pure latency minimization)
-        reward = self.simulator.calculate_latency_reward(
-            latency_s, 
-            scale_factor=self.reward_scale
-        )
+        reward = self.simulator.calculate_latency_reward(latency_s)
         
         # Step 5: Get next state
         next_state, done = self.simulator.get_next_state(
@@ -217,7 +238,7 @@ class TabularDoubleQLearningAgent:
         self.current_episode_latency += latency_ms
         self.current_episode_reward += reward
         
-        return action, reward, latency_s, next_state, done
+        return action, reward, latency_s, next_state, done, overhead_time
     
     # =========================================================================
     # DOUBLE Q-LEARNING UPDATE
@@ -260,16 +281,14 @@ class TabularDoubleQLearningAgent:
             
             # Step 2: Evaluate that action using the other Q-table
             if best_action_key is None:
-                # Fallback (should not happen)
                 target = reward
             else:
                 q_other_val = Q_other.get((next_state_key, best_action_key), 0.0)
                 target = reward + self.gamma * q_other_val
         
-        # TD error
+        # TD error (clipped for stability)
         old_q = Q_current.get((state_key, action_key), 0.0)
-        td_error = target - old_q
-        td_error = np.clip(td_error, -10000.0, 10000.0)
+        td_error = np.clip(target - old_q, -10.0, 10.0)   # reasonable clipping
         
         # Update the chosen Q-table
         new_q = old_q + self.alpha * td_error
@@ -282,10 +301,11 @@ class TabularDoubleQLearningAgent:
     # =========================================================================
     
     def start_episode(self):
-        """Reset episode tracking and simulator time."""
+        """Reset episode tracking, simulator time, and group action cache."""
         self.current_episode_latency = 0.0
         self.current_episode_reward = 0.0
         self.simulator.reset_episode_time()
+        self.group_range_assignments.clear()   # Clear group cache for new episode
     
     def end_episode(self):
         """

@@ -21,7 +21,7 @@ def create_initial_state(simulator):
     
     return (bandwidth, cloud_contention, layer, previous_assignment)
 
-def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False, verbose=True): 
+def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False, verbose=True, total_pipelines=1): 
     """Main training loop."""
     
     # Create agent
@@ -32,6 +32,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         alpha_critic=0.05,
         gamma=0.95,
         reward_scale=10.0,  # Scale reward magnitude
+        total_pipelines=total_pipelines
     )
 
     grouping_RL_agent = GroupingRL()
@@ -65,6 +66,8 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
     state = (bandwidth, cloud_contention, 0, None)  # Start at layer 0 with no previous assignment
     agent.load()  # Load existing model if available
     grouping_RL_agent.load()  # Load grouping agent if it has a saved state
+    episode_overhead_time = []
+    average_step_overhead_times = []
     for episode in range(NUM_EPISODES):
         rewards_ep = 0
         state = (bandwidth, cloud_contention, 0, None)
@@ -73,6 +76,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         done = False
         step_count = 0
         td_errors = []
+        step_overhead_time = []
         last_pipeline_contention.append(state[1])
         
         number_of_groups = grouping_RL_agent.train(bandwidth, average_last_pipeline_contention)
@@ -82,7 +86,8 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         # Run episode
         action_array = []
         while not done:
-            action, reward, latency_s, next_state, done = agent.step(state, numberOfGroups=number_of_groups)
+            action, reward, latency_s, next_state, done, overhead_time_per_step = agent.step(state, num_groups=number_of_groups)
+            step_overhead_time.append(overhead_time_per_step)
             action_array.append(action)
             rewards_ep += reward
             last_pipeline_contention.append(next_state[1])
@@ -92,7 +97,9 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
             td_errors.append(td_error)
             state = next_state
             step_count += 1
-        
+        episode_overhead_time.append(np.sum(step_overhead_time))
+        average_step_overhead_times.append(np.mean(step_overhead_time))
+
         average_last_pipeline_contention = np.mean(last_pipeline_contention) if last_pipeline_contention else 0.0
         last_pipeline_contention = []
         # asyncio.run(grouping_RL_agent.push_reward(rewards_ep))
@@ -127,15 +134,22 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
     
     # Final save
     agent.save()
-    
+
+    print("\n" + "=" * 80)
+
+    print("Episode Overhead Times:")
+    print(f"Mean overhead time per episode: {np.mean(episode_overhead_time[100:])*1000:.4f}ms")
+    print(f"Std overhead time per episode: {np.std(episode_overhead_time[100:])*1000:.4f}ms")
+    print(f"Mean overhead time per step: {np.mean(average_step_overhead_times)*1000:.4f}ms")
+
     print("=" * 80)
     print("TRAINING COMPLETE")
     print("=" * 80)
     print(f"Best latency: {best_latency:.2f}ms at episode {best_episode}")
     print(f"Final temperature: {agent.temperature:.3f}")
     print("=" * 80)
-    
-    return agent, episode_latencies, episode_rewards
+
+    return agent, episode_latencies, episode_rewards, np.mean(episode_overhead_time[100:])
 
 def evaluate_agent(agent, num_episodes=100):
     """

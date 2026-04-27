@@ -83,12 +83,17 @@ class GroupingRL:
                  gamma=GAMMA,
                  alpha_policy=ALPHA_POLICY,
                  alpha_value=ALPHA_VALUE,
-                 epsilon_min=EPSILON_MIN):
+                 epsilon_min=EPSILON_MIN,
+                 total_pipelines=1
+                 ):
 
         self.num_bw_bins = num_bw_bins
         self.num_cont_bins = num_cont_bins
         self.num_states = num_bw_bins * num_cont_bins
-        self.num_actions = num_actions
+
+        self.K_MIN = 3 * total_pipelines
+        self.K_MAX = 399 * total_pipelines
+        self.num_actions = self.K_MAX - self.K_MIN + 1
 
         self.gamma = gamma
         self.alpha_policy = alpha_policy
@@ -106,7 +111,8 @@ class GroupingRL:
         # --- Async reward queue: downstream RL pushes (reward, context) here ---
         # Context carries the info we need to run the A2C update when the reward
         # arrives (state index, chosen action, next state).
-        self.reward_queue: asyncio.Queue = asyncio.Queue()
+        # Initialize lazily to avoid event loop issues
+        self.reward_queue = None
 
         # --- Exploration schedule ---
         self.step_count = 0
@@ -115,8 +121,20 @@ class GroupingRL:
         self.last_state_key = None
         self.last_action_key = None
 
-
-
+    def _ensure_reward_queue(self):
+        """
+        Lazily create the async queue when we have an event loop.
+        This prevents the RuntimeError when no event loop exists during __init__.
+        """
+        if self.reward_queue is None:
+            try:
+                self.reward_queue = asyncio.Queue()
+            except RuntimeError:
+                # No event loop running, create one
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                self.reward_queue = asyncio.Queue()
+        return self.reward_queue
 
     # =====================================================================
     # STATE / ACTION KEY CONVERSIONS
@@ -134,18 +152,18 @@ class GroupingRL:
         ct_bin = int(np.clip(np.digitize(mean_contention, CONT_BIN_EDGES) - 1,
                              0, self.num_cont_bins - 1))
         
-        return (bw_bin,ct_bin)
+        return (bw_bin, ct_bin)
 
     def action_to_key(self, K: int) -> int:
         """
         Map a K value (number of groups, in [K_MIN, K_MAX]) to a column index
         into policy_table (in [0, num_actions)).
         """
-        return int(K) - K_MIN
+        return int(K) - self.K_MIN
 
     def key_to_action(self, action_key: int) -> int:
         """Inverse of action_to_key: column index -> K value."""
-        return int(action_key) + K_MIN
+        return int(action_key) + self.K_MIN
 
     # =====================================================================
     # POLICY & TEMPERATURE
@@ -188,7 +206,7 @@ class GroupingRL:
         state_key = self.state_to_key(bandwidth, mean_contention)
 
         # Epsilon-greedy forced exploration
-        if self.epsilon_min > 0.0:
+        if self.epsilon_min > 0.0 and np.random.random() < self.epsilon_min:
             action_key = int(np.random.randint(self.num_actions))
         else:
             probs = self._policy_probs(state_key)
@@ -206,7 +224,7 @@ class GroupingRL:
     # A2C UPDATE (the core table update logic)
     # =====================================================================
     def _update_tables(self, state_key, action_key: int,
-                       reward: float, next_state_key,
+                       reward: float, next_state_key=None,
                        done: bool = False) -> dict:
         """
         One-step A2C update:
@@ -219,7 +237,7 @@ class GroupingRL:
         rule. The value update is standard TD(0).
         """
         V_s = self.value_table.get(state_key, 0.0)
-        V_next = self.value_table.get(next_state_key, 0.0) if not done else 0.0
+        V_next = self.value_table.get(next_state_key, 0.0) if next_state_key is not None and not done else 0.0
 
         td_target = reward + self.gamma * V_next
         td_error = td_target - V_s
@@ -255,8 +273,7 @@ class GroupingRL:
             action_key (int): action index = K - K_MIN (for the reward payload).
         """
         K = self.choose_action(bandwidth, mean_contention)
-        return K 
-
+        return K
 
     # =====================================================================
     # ASYNC REWARD RECEIPT
@@ -280,30 +297,26 @@ class GroupingRL:
             True  if the update succeeded.
             False if the queue entry was malformed.
         """
-        # try:
-        #     payload = await self.reward_queue.get()
-        # except asyncio.CancelledError:
-        #     return False
-
+        self._ensure_reward_queue()
+        
         try:
             reward = reward
             state_key = self.last_state_key       # tuple (bw_bin, ct_bin)
             action_key = self.last_action_key
             done = False
+            next_state_key = None
         except (KeyError, TypeError, ValueError) as e:
             print(f"[GroupingRL] Malformed reward payload: {e}")
             return False
 
         # Update tables
-        self._update_tables(state_key, action_key, reward, done)
-        # self.reward_queue.task_done()
+        self._update_tables(state_key, action_key, reward, next_state_key, done)
         return True
 
     # =====================================================================
     # HELPER: let the downstream RL push a reward
     # =====================================================================
-    async def push_reward(self, reward: float,
-                         done: bool = False):
+    async def push_reward(self, reward: float, done: bool = False):
         """
         Convenience method the downstream offloading RL can call to deliver
         the latency-based reward asynchronously.
@@ -311,12 +324,37 @@ class GroupingRL:
         In a real system you might just hand the queue reference directly to
         the downstream RL; this method is a thin wrapper for clarity.
         """
+        self._ensure_reward_queue()
         await self.reward_queue.put({
             "reward": reward,
             "state_key": self.last_state_key,
             "action_key": self.last_action_key,
             "done": done,
         })
+
+    async def get_reward_from_queue(self):
+        """
+        Alternative method that actually waits for a reward from the queue.
+        This is useful if you want to block until a reward is available.
+        """
+        self._ensure_reward_queue()
+        try:
+            payload = await self.reward_queue.get()
+            state_key = payload.get("state_key", self.last_state_key)
+            action_key = payload.get("action_key", self.last_action_key)
+            reward = payload.get("reward", 0.0)
+            next_state_key = payload.get("next_state_key", None)
+            done = payload.get("done", False)
+            
+            self._update_tables(state_key, action_key, reward, next_state_key, done)
+            self.reward_queue.task_done()
+            return True
+        except asyncio.CancelledError:
+            return False
+        except (KeyError, TypeError, ValueError) as e:
+            print(f"[GroupingRL] Malformed reward payload: {e}")
+            return False
+
     # =====================================================================
     # UTILITIES
     # =====================================================================
@@ -339,7 +377,7 @@ class GroupingRL:
             "state_key": state_key,
             "V(s)": float(self.value_table.get(state_key, 0.0)),
             "temperature": self._current_temperature(),
-            "top5_actions_K": [int(i + K_MIN) for i in top_k],
+            "top5_actions_K": [int(i + self.K_MIN) for i in top_k],
             "top5_probs": [float(probs[i]) for i in top_k],
         }
 
