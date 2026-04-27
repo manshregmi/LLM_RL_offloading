@@ -97,7 +97,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
             td_errors.append(td_error)
             state = next_state
             step_count += 1
-        episode_overhead_time.append(np.sum(step_overhead_time)*1000)
+        episode_overhead_time.append(np.sum(step_overhead_time))
         average_step_overhead_times.append(np.mean(step_overhead_time))
 
         average_last_pipeline_contention = np.mean(last_pipeline_contention) if last_pipeline_contention else 0.0
@@ -138,8 +138,8 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
     print("\n" + "=" * 80)
 
     print("Episode Overhead Times:")
-    print(f"Mean overhead time per episode: {np.mean(episode_overhead_time)*1000:.4f}ms")
-    print(f"Std overhead time per episode: {np.std(episode_overhead_time)*1000:.4f}ms")
+    print(f"Mean overhead time per episode: {np.mean(episode_overhead_time[100:])*1000:.4f}ms")
+    print(f"Std overhead time per episode: {np.std(episode_overhead_time[100:])*1000:.4f}ms")
     print(f"Mean overhead time per step: {np.mean(average_step_overhead_times)*1000:.4f}ms")
 
     print("=" * 80)
