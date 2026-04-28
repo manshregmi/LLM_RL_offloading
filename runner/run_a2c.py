@@ -35,7 +35,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         total_pipelines=total_pipelines
     )
 
-    grouping_RL_agent = GroupingRL()
+    # grouping_RL_agent = GroupingRL()
     
     # Training parameters
     NUM_EPISODES = episodes
@@ -65,7 +65,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
     average_last_pipeline_contention = 0.0
     state = (bandwidth, cloud_contention, 0, None)  # Start at layer 0 with no previous assignment
     agent.load()  # Load existing model if available
-    grouping_RL_agent.load()  # Load grouping agent if it has a saved state
+    # grouping_RL_agent.load()  # Load grouping agent if it has a saved state
     episode_overhead_time = []
     average_step_overhead_times = []
     for episode in range(NUM_EPISODES):
@@ -79,14 +79,14 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         step_overhead_time = []
         last_pipeline_contention.append(state[1])
         
-        number_of_groups = grouping_RL_agent.train(bandwidth, average_last_pipeline_contention)
+        # number_of_groups = grouping_RL_agent.train(bandwidth, average_last_pipeline_contention)
         # print("number of groups: ", number_of_groups)
         # print("average_last_pipeline_contention: ", average_last_pipeline_contention)
 
         # Run episode
         action_array = []
         while not done:
-            action, reward, latency_s, next_state, done, overhead_time_per_step = agent.step(state, num_groups=number_of_groups)
+            action, reward, latency_s, next_state, done, overhead_time_per_step = agent.step(state, num_groups=None)
             step_overhead_time.append(overhead_time_per_step)
             action_array.append(action)
             rewards_ep += reward
@@ -102,11 +102,9 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
 
         average_last_pipeline_contention = np.mean(last_pipeline_contention) if last_pipeline_contention else 0.0
         last_pipeline_contention = []
-        # asyncio.run(grouping_RL_agent.push_reward(rewards_ep))
-        # asyncio.run(grouping_RL_agent.get_reward())
-        asyncio.run(grouping_RL_agent.get_reward(rewards_ep))
-        if (episode % 100)== 0:
-            grouping_RL_agent.save()  # Save grouping agent state after each episode
+        # asyncio.run(grouping_RL_agent.get_reward(rewards_ep))
+        # if (episode % 100)== 0:
+        #     grouping_RL_agent.save()  # Save grouping agent state after each episode
         # End episode
         total_latency_ms, total_reward = agent.end_episode()
         episode_latencies.append(total_latency_ms)
