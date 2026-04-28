@@ -174,7 +174,7 @@ if __name__ == "__main__":
         print("=" * 80)
         
         # Define number of episodes for training and baselines
-        TRAIN_EPISODES = 1000
+        TRAIN_EPISODES = 500
         BASELINE_EPISODES = 1
         
         # # Run baseline schedulers
