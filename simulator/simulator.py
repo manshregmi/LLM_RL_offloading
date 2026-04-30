@@ -294,27 +294,27 @@ class CloudEdgeSimulator:
        
         # Check if this was the last layer
         if layer + 1 < len(self.profiling.layers):
-            # terminal = False
-            # if 20 < layer < 100:
-            #     if np.random.rand() < 0.01:
-            #         next_layer = 100
-            #     else:
-            #         next_layer = layer + 1
+             terminal = False
+             if 20 < layer < 100:
+                 if np.random.rand() < 0.01:
+                     next_layer = 100
+                 else:
+                     next_layer = layer + 1
  
-            # elif 180 < layer < 300:
-            #     if np.random.rand() < 0.01:
-            #         next_layer = 300
-            #     else:
-            #         next_layer = layer + 1
+             elif 180 < layer < 300:
+                 if np.random.rand() < 0.01:
+                     next_layer = 300
+                 else:
+                     next_layer = layer + 1
  
-            # elif 350 < layer < 400:
-            #     if np.random.rand() < 0.01:
-            #         next_layer = 400
-            #         terminal = True
-            #     else:
-            #       next_layer = layer + 1
+             elif 350 < layer < 400:
+                 if np.random.rand() < 0.01:
+                     next_layer = 400
+                     terminal = True
+                 else:
+                   next_layer = layer + 1
  
-            # else:
+             else:
                 next_layer = layer + 1
                 terminal = False
         else:

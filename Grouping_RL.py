@@ -43,12 +43,12 @@ NUM_ACTIONS = K_MAX - K_MIN + 1     # 397 possible K values
 # --- State discretization ---
 # 10 bins per dimension -> 100 states. Coarse enough for fast convergence,
 # fine enough to capture meaningful (bw, contention) variation.
-NUM_BW_BINS = 9
+NUM_BW_BINS = 14
 NUM_CONT_BINS = 19
 NUM_STATES = NUM_BW_BINS * NUM_CONT_BINS
 
 # Bin edges — adjust these to match your simulator's real BW/contention ranges.
-BW_BIN_EDGES = np.linspace(1, 15.0, NUM_BW_BINS + 1)      # Mbps
+BW_BIN_EDGES = np.linspace(9, 35.0, NUM_BW_BINS + 1)      # Mbps
 CONT_BIN_EDGES = np.linspace(0, 20.0, NUM_CONT_BINS + 1)  # ms
 
 # --- Exploration ---

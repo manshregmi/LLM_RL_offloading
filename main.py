@@ -115,37 +115,37 @@ def moving_average(data, window):
     """Compute moving average with given window size."""
     return np.convolve(data, np.ones(window)/window, mode='valid')
 
-def plot_convergence_curve(episode_rewards, window=100, title="", 
-                           xlabel="Episode", ylabel="Reward", save_path="/Users/Manish/Desktop/LLM_RL_offloading/"):
-    """
-    Plot smoothed convergence curve of episode rewards (or latencies).
+# def plot_convergence_curve(episode_rewards, window=100, title="", 
+    # xlabel="Episode", ylabel="Reward", save_path="/Users/Manish/Desktop/LLM_RL_offloading/"):
+    # """
+    # Plot smoothed convergence curve of episode rewards (or latencies).
     
-    Args:
-        episode_rewards: list or array of values per episode
-        window: moving average window size
-        title, xlabel, ylabel: plot labels
-        save_path: if provided, save figure to this path
-    """
-    plt.figure(figsize=(10, 6))
+    # Args:
+    #     episode_rewards: list or array of values per episode
+    #     window: moving average window size
+    #     title, xlabel, ylabel: plot labels
+    #     save_path: if provided, save figure to this path
+    # """
+    # plt.figure(figsize=(10, 6))
     
-    # Plot raw values (light, semi-transparent)
-    episodes = np.arange(len(episode_rewards))
-    # plt.plot(episodes, episode_rewards, alpha=0.3, color='gray', label='Raw')
+    # # Plot raw values (light, semi-transparent)
+    # episodes = np.arange(len(episode_rewards))
+    # # plt.plot(episodes, episode_rewards, alpha=0.3, color='gray', label='Raw')
     
-    # Plot smoothed values
-    smoothed = moving_average(episode_rewards, window)
-    smoothed_episodes = np.arange(window-1, len(episode_rewards))
-    plt.plot(smoothed_episodes, smoothed, linewidth=2, color='blue', label=f'Moving avg (window={window})')
+    # # Plot smoothed values
+    # smoothed = moving_average(episode_rewards, window)
+    # smoothed_episodes = np.arange(window-1, len(episode_rewards))
+    # plt.plot(smoothed_episodes, smoothed, linewidth=2, color='blue', label=f'Moving avg (window={window})')
     
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.legend()
-    plt.grid(True, alpha=0.3)
+    # plt.title(title)
+    # plt.xlabel(xlabel)
+    # plt.ylabel(ylabel)
+    # plt.legend()
+    # plt.grid(True, alpha=0.3)
     
-    if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches='tight')
-    plt.show()
+    # if save_path:
+    #     plt.savefig(save_path, dpi=150, bbox_inches='tight')
+    # plt.show()
 
 if __name__ == "__main__":
     # Load profiling data
@@ -154,28 +154,28 @@ if __name__ == "__main__":
     print("=" * 80)
     profiling_data = get_LLM_profiling_data()
     pipleline_overhead_time = []
+    n = 1 
 
-    for n in range(1,10,2):
-        try:
-            os.remove("a2c_tables.pkl")
-        except FileNotFoundError:
-            pass   # Ignore if file doesn’t exist (like rm -f)
-        try:
-            os.remove("grouping_rl_tables.pkl")
-        except FileNotFoundError:
-            pass   # Ignore if file doesn’t exist (like rm -f)
+    #try:
+    #    os.remove("a2c_tables.pkl")
+    #except FileNotFoundError:
+    #    pass   # Ignore if file doesn’t exist (like rm -f)
+    #try:
+     #   os.remove("grouping_rl_tables.pkl")
+    #except FileNotFoundError:
+    #    pass   # Ignore if file doesn’t exist (like rm -f)
         
-        cascaded_profiling_data = cascade_profiling(profiling_data,n=n)  # Create 3 copies for pipelining
-        print(f"✅ Loaded profiling data")
-        print(f"   Number of layers: {len(profiling_data.layers)}")
-        print(f"   Number of edge devices: {profiling_data.numberOfEdgeDevice}")
-        print(f"   RTT: {profiling_data.rtt}ms")
-        print(f"   Deadline (info only): {profiling_data.deadline}ms")
-        print("=" * 80)
+    cascaded_profiling_data = cascade_profiling(profiling_data,n=n)  # Create 3 copies for pipelining
+    print(f"✅ Loaded profiling data")
+    print(f"   Number of layers: {len(profiling_data.layers)}")
+    print(f"   Number of edge devices: {profiling_data.numberOfEdgeDevice}")
+    print(f"   RTT: {profiling_data.rtt}ms")
+    print(f"   Deadline (info only): {profiling_data.deadline}ms")
+    print("=" * 80)
         
         # Define number of episodes for training and baselines
-        TRAIN_EPISODES = 1000
-        BASELINE_EPISODES = 1
+    TRAIN_EPISODES = 10000
+    BASELINE_EPISODES = 1
         
         # # Run baseline schedulers
         # baseline_results = run_baseline_comparison(
@@ -184,20 +184,20 @@ if __name__ == "__main__":
         # )
         
         # Train A2C agent
-        print("\n" + "=" * 80)
-        print("TRAINING A2C AGENT")
-        print("=" * 80)
+    print("\n" + "=" * 80)
+    print("TRAINING A2C AGENT")
+    print("=" * 80)
         
-        agent, episode_latencies, episode_rewards, overhead_time = train_a2c_agent(
-            profiling_data=cascaded_profiling_data,
-            episodes=TRAIN_EPISODES,
-            is_test=True,           # Training mode
-            verbose=False,            # Print progress
-            total_pipelines=n
-        )
-        pipleline_overhead_time.append(overhead_time)
-        print(f"Pipeline overhead time for {n} pipelines: {overhead_time:.2f} ms")
-    pd.DataFrame(pipleline_overhead_time).to_csv('pipeline_overhead.csv', index=False, header=False)
+    agent, episode_latencies, episode_rewards, overhead_time = train_a2c_agent(
+        profiling_data=cascaded_profiling_data,
+        episodes=TRAIN_EPISODES,
+        is_test=True,           # Training mode
+        verbose=False,            # Print progress
+        total_pipelines=n
+    )
+    pipleline_overhead_time.append(overhead_time)
+    print(f"Pipeline overhead time for {n} pipelines: {overhead_time:.2f} ms")
+    pd.DataFrame(pipleline_overhead_time).to_csv('overhead.csv', index=False, header=False)
 
     # agent_dq, episode_latencies_dq, episode_rewards_dq = train_double_q_agent(
     #     profiling_data=profiling_data,
@@ -207,7 +207,7 @@ if __name__ == "__main__":
     # )
     # latencies_ms, rewards, assignment_counts = evaluate_agent(agent, num_episodes=1000)
 
-    # plot_convergence_curve(episode_rewards)
+   # plot_convergence_curve(episode_rewards)
 
     # segments = aggregate_assignments_by_segment(assignment_counts)
 

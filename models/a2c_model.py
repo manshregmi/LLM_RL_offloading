@@ -33,7 +33,7 @@ class TabularActorCriticAgent:
         self.value_table = {}
         self.simulator = CloudEdgeSimulator(profiling_data,total_pipeline=total_pipelines)
         
-        self.bandwidth_bins = np.linspace(1, 15, 15)
+        self.bandwidth_bins = np.linspace(9, 35, 15)
         self.cloudtime_bins = np.linspace(0, 100, 20)
         
         self.temperature = 1.0
