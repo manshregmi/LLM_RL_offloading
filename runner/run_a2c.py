@@ -104,8 +104,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         average_last_pipeline_contention = np.mean(last_pipeline_contention) if last_pipeline_contention else 0.0
         last_pipeline_contention = []
         # asyncio.run(grouping_RL_agent.get_reward(rewards_ep))
-        if (episode % 100)== 0:
-            grouping_RL_agent.save()  # Save grouping agent state after each episode
+        
         # End episode
         total_latency_ms, total_reward = agent.end_episode()
         episode_latencies.append(total_latency_ms)
@@ -118,6 +117,9 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
             next_state_key=None,
             done=True
             )
+        
+        if (episode % 100)== 0:
+            grouping_RL_agent.save()  # Save grouping agent state after each episode
 
 
 
