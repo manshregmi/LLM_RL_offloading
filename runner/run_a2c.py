@@ -35,7 +35,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         total_pipelines=total_pipelines
     )
 
-    # grouping_RL_agent = GroupingRL()
+    grouping_RL_agent = GroupingRL()
     
     # Training parameters
     NUM_EPISODES = episodes
@@ -65,9 +65,10 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
     average_last_pipeline_contention = 0.0
     state = (bandwidth, cloud_contention, 0, None)  # Start at layer 0 with no previous assignment
     agent.load()  # Load existing model if available
-    # grouping_RL_agent.load()  # Load grouping agent if it has a saved state
+    grouping_RL_agent.load()  # Load grouping agent if it has a saved state
     episode_overhead_time = []
     average_step_overhead_times = []
+    episode_number_of_groups = []
     for episode in range(NUM_EPISODES):
         rewards_ep = 0
         state = (bandwidth, cloud_contention, 0, None)
@@ -79,14 +80,14 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         step_overhead_time = []
         last_pipeline_contention.append(state[1])
         
-        # number_of_groups = grouping_RL_agent.train(bandwidth, average_last_pipeline_contention)
+        number_of_groups = grouping_RL_agent.train(bandwidth, average_last_pipeline_contention)
         # print("number of groups: ", number_of_groups)
         # print("average_last_pipeline_contention: ", average_last_pipeline_contention)
-
+        episode_number_of_groups.append(number_of_groups)
         # Run episode
         action_array = []
         while not done:
-            action, reward, latency_s, next_state, done, overhead_time_per_step = agent.step(state, num_groups=None)
+            action, reward, latency_s, next_state, done, overhead_time_per_step = agent.step(state, num_groups=number_of_groups)
             step_overhead_time.append(overhead_time_per_step)
             action_array.append(action)
             rewards_ep += reward
@@ -103,13 +104,23 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         average_last_pipeline_contention = np.mean(last_pipeline_contention) if last_pipeline_contention else 0.0
         last_pipeline_contention = []
         # asyncio.run(grouping_RL_agent.get_reward(rewards_ep))
-        # if (episode % 100)== 0:
-        #     grouping_RL_agent.save()  # Save grouping agent state after each episode
+        if (episode % 100)== 0:
+            grouping_RL_agent.save()  # Save grouping agent state after each episode
         # End episode
         total_latency_ms, total_reward = agent.end_episode()
         episode_latencies.append(total_latency_ms)
         episode_rewards.append(total_reward)
         
+        grouping_RL_agent._update_tables(
+            state_key=grouping_RL_agent.last_state_key,
+            action_key=grouping_RL_agent.last_action_key,
+            reward=total_reward,
+            next_state_key=None,
+            done=True
+            )
+
+
+
         # Update best
         if total_latency_ms < best_latency:
             best_latency = total_latency_ms
@@ -146,6 +157,18 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
     print(f"Best latency: {best_latency:.2f}ms at episode {best_episode}")
     print(f"Final temperature: {agent.temperature:.3f}")
     print("=" * 80)
+
+    print("Episode Number of Groups:")
+    print(f"Mean number of groups per episode: {np.mean(episode_number_of_groups):.4f}")
+    print(f"Std number of groups per episode: {np.std(episode_number_of_groups):.4f}")
+
+    plt.plot(episode_number_of_groups)
+    plt.xlabel("Episode")
+    plt.ylabel("Number of Groups")
+    plt.title("Number of Groups per Episode")
+    plt.savefig("number_of_groups_per_episode.png", dpi=600)
+    plt.show()
+
 
     return agent, episode_latencies, episode_rewards, np.mean(episode_overhead_time[100:])
 
@@ -262,18 +285,32 @@ def aggregate_assignments_by_segment(assignment_counts):
     
     return segments
 
-def plot_assignment_percentages(segments):
+def plot_assignment_percentages():
     """Create a bar chart of edge vs cloud percentages per model segment."""
-    labels = list(segments.keys())
-    edge_pcts = [segments[seg]['edge_pct'] for seg in labels]
-    cloud_pcts = [segments[seg]['cloud_pct'] for seg in labels]
-    
+
+    plt.rcParams['font.family'] = 'serif'
+    plt.rcParams['font.serif'] = ['Times New Roman']
+    plt.rcParams['axes.titlesize'] = 28
+    plt.rcParams['axes.labelsize'] = 28
+    plt.rcParams['xtick.labelsize'] = 24
+    plt.rcParams['ytick.labelsize'] = 24
+    plt.rcParams['legend.fontsize'] = 24
+    plt.rcParams['figure.titlesize'] = 28
+
+
+
+    labels = ['YOLOS', 'LLAMA 1', 'LLAMA 2', 'BART']
+    # edge_pcts = [segments[seg]['edge_pct'] for seg in labels]
+    # cloud_pcts = [segments[seg]['cloud_pct'] for seg in labels]
+    edge_pcts = [16.5,42.4,42.9,22.9]
+    cloud_pcts = [83.5,57.6,57.1,77.1]
+
     x = np.arange(len(labels))
     width = 0.35
     
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(10, 6))  # instead of (10, 6)
     bars1 = ax.bar(x - width/2, edge_pcts, width, label='Edge', color='#4477AA')
-    bars2 = ax.bar(x + width/2, cloud_pcts, width, label='Cloud', color='#66CCEE')
+    bars2 = ax.bar(x + width/2, cloud_pcts, width, label='Cloudlet', color='#66CCEE')
     
     ax.set_ylabel('Percentage of assignments (%)')
     ax.set_title('Assignment vector per model Segment')
@@ -285,13 +322,14 @@ def plot_assignment_percentages(segments):
     for bar in bars1:
         height = bar.get_height()
         ax.annotate(f'{height:.1f}%', xy=(bar.get_x() + bar.get_width()/2, height),
-                    xytext=(0, 3), textcoords="offset points", ha='center', va='bottom')
+                    xytext=(0, 3), textcoords="offset points", ha='center', va='bottom',fontsize=24)
     for bar in bars2:
         height = bar.get_height()
         ax.annotate(f'{height:.1f}%', xy=(bar.get_x() + bar.get_width()/2, height),
-                    xytext=(0, 3), textcoords="offset points", ha='center', va='bottom')
+                    xytext=(0, 3), textcoords="offset points", ha='center', va='bottom', fontsize=24)
     
-    plt.tight_layout()
+    # plt.tight_layout()
+    plt.savefig("assignment_percentages.png", dpi=600)
     plt.show()
 
 # if __name__ == "__main__":
