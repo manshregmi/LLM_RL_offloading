@@ -35,7 +35,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         total_pipelines=total_pipelines
     )
 
-    grouping_RL_agent = GroupingRL()
+    grouping_RL_agent = GroupingRL(total_pipelines=total_pipelines)
     
     # Training parameters
     NUM_EPISODES = episodes

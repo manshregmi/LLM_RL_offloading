@@ -21,6 +21,25 @@ Design:
 
 import asyncio
 import numpy as np
+B = 3 
+L = 400 
+PHI = 5
+
+def get_k_values (B :int , L :int , phi:int ) -> list[int]: 
+    B, L, phi = int(B), int(L), int(phi) 
+    if phi<=B : 
+        raise ValueError(
+
+        )
+    upper_bound = L // 2 
+    valid = [k for k in range(phi, upper_bound + 1, phi)]
+    if not valid:
+        raise ValueError(
+            f"No valid K values found: phi={phi}, B={B}, L={L}. "
+            f"Check that phi <= L // 2 ({upper_bound})."
+        )
+    return valid
+
 
 
 # =========================================================================
@@ -79,6 +98,9 @@ class GroupingRL:
     def __init__(self,
                  num_bw_bins=NUM_BW_BINS,
                  num_cont_bins=NUM_CONT_BINS,
+                 B: int = B, 
+                 L: int = L, 
+                 phi: int = PHI, 
                  num_actions=NUM_ACTIONS,
                  gamma=GAMMA,
                  alpha_policy=ALPHA_POLICY,
@@ -90,10 +112,18 @@ class GroupingRL:
         self.num_bw_bins = num_bw_bins
         self.num_cont_bins = num_cont_bins
         self.num_states = num_bw_bins * num_cont_bins
+        self.B   = int (B   * total_pipelines)
+        self.L   = int (L   * total_pipelines)
+        self.phi = int (phi * total_pipelines)
+        self.valid_k_values: list[int] = get_k_values(self.B, self.L, self.phi)
+        self.num_actions: int = len(self.valid_k_values)
+        self._k_index_map: dict[int, int] = {
+            k: idx for idx, k in enumerate(self.valid_k_values)
+        }
 
-        self.K_MIN = 3 * total_pipelines
-        self.K_MAX = 399 * total_pipelines
-        self.num_actions = self.K_MAX - self.K_MIN + 1
+        # self.K_MIN = 3 * total_pipelines
+        # self.K_MAX = 399 * total_pipelines
+        # self.num_actions = self.K_MAX - self.K_MIN + 1
 
         self.gamma = gamma
         self.alpha_policy = alpha_policy
@@ -155,15 +185,17 @@ class GroupingRL:
         return (bw_bin, ct_bin)
 
     def action_to_key(self, K: int) -> int:
-        """
-        Map a K value (number of groups, in [K_MIN, K_MAX]) to a column index
-        into policy_table (in [0, num_actions)).
-        """
-        return int(K) - self.K_MIN
+        if K not in self._k_index_map:
+            raise KeyError(
+                f"K={K} is not a valid action. "
+                f"Valid values are multiples of phi={self.phi} "
+                f"in [{self.valid_k_values[0]}, {self.valid_k_values[-1]}]."
+            )
+        return self._k_index_map[K]
 
     def key_to_action(self, action_key: int) -> int:
         """Inverse of action_to_key: column index -> K value."""
-        return int(action_key) + self.K_MIN
+        return self.valid_k_values[action_key]
 
     # =====================================================================
     # POLICY & TEMPERATURE
@@ -369,18 +401,30 @@ class GroupingRL:
         return self.key_to_action(action_key)
 
     def state_summary(self, bandwidth: float, mean_contention: float) -> dict:
-        """Diagnostics for a given state."""
+        """Diagnostics for a given (bandwidth, contention) state."""
         state_key = self.state_to_key(bandwidth, mean_contention)
-        probs = self._policy_probs(state_key)
-        top_k = np.argsort(probs)[-5:][::-1]
+        probs     = self._policy_probs(state_key)
+        top_k_idx = np.argsort(probs)[-5:][::-1]
         return {
-            "state_key": state_key,
-            "V(s)": float(self.value_table.get(state_key, 0.0)),
-            "temperature": self._current_temperature(),
-            "top5_actions_K": [int(i + self.K_MIN) for i in top_k],
-            "top5_probs": [float(probs[i]) for i in top_k],
+            "state_key":       state_key,
+            "V(s)":            float(self.value_table.get(state_key, 0.0)),
+            "temperature":     self._current_temperature(),
+            "valid_k_count":   self.num_actions,
+            "top5_actions_K":  [self.valid_k_values[i] for i in top_k_idx],
+            "top5_probs":      [float(probs[i]) for i in top_k_idx],
         }
-
+ 
+    def action_space_summary(self) -> dict:
+        """Return a summary of the current valid K action space."""
+        return {
+            "B":              self.B,
+            "L":              self.L,
+            "phi":            self.phi,
+            "K_min":          self.valid_k_values[0],
+            "K_max":          self.valid_k_values[-1],
+            "num_actions":    self.num_actions,
+            "valid_k_values": self.valid_k_values,
+        }
     # =====================================================================
     # PERSISTENCE
     # =====================================================================
