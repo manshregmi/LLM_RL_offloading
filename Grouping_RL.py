@@ -25,19 +25,23 @@ B = 3
 L = 400 
 PHI = 5
 
-def get_k_values (B :int , L :int , phi:int ) -> list[int]: 
-    B, L, phi = int(B), int(L), int(phi) 
-    if phi<=B : 
-        raise ValueError(
+from typing import List
 
-        )
-    upper_bound = L // 2 
+def get_k_values(B: int, L: int, phi: int) -> List[int]:
+    B, L, phi = int(B), int(L), int(phi)
+    
+    if phi <= B:
+        raise ValueError("phi must be greater than B")
+
+    upper_bound = L // 2
     valid = [k for k in range(phi, upper_bound + 1, phi)]
+
     if not valid:
         raise ValueError(
             f"No valid K values found: phi={phi}, B={B}, L={L}. "
             f"Check that phi <= L // 2 ({upper_bound})."
         )
+    
     return valid
 
 
