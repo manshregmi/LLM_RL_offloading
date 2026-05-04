@@ -5,6 +5,7 @@ import pickle
 import os
 from profiling.profiling_class import ProfilingData
 from simulator.simulator import CloudEdgeSimulator
+from collections import Counter
 
 
 class TabularActorCriticAgent:
@@ -84,45 +85,116 @@ class TabularActorCriticAgent:
     # -------------------------------------------------------------------------
     # Action Selection (with optional group caching)
     # -------------------------------------------------------------------------
+
     def choose_action(self, state, num_groups=None):
+        original_prev_assignment = state[3] if len(state) > 3 else None
+        state_bw = float(state[0])
+        state_ctime = float(state[1])
         layer = int(state[2])
 
-        # # Group caching: if we already have an action for this group, reuse it
-        # if num_groups is not None and num_groups > 0:
-        #     chunk_idx = self._get_chunk_index(layer, num_groups)
-        #     cache_key = (num_groups, chunk_idx)
-        #     if cache_key in self.group_range_assignments:
-        #         return self.group_range_assignments[cache_key]
-            
+        # ---------- Grouped case: use majority voting over the whole chunk ----------
+        if num_groups is not None and num_groups > 0:
+            chunk_idx = self._get_chunk_index(layer, num_groups)
+            cache_key = (num_groups, chunk_idx)
 
+            # 1. if already cached, return the stored assignment
+            if cache_key in self.group_range_assignments:
+                return self.group_range_assignments[cache_key]
+
+            # 2. not cached → simulate all layers in this chunk, collect majority action
+            start_layer, end_layer = self._get_chunk_range(chunk_idx, num_groups)
+
+            # initial state for the first layer of the chunk
+            curr_state = (state_bw, state_ctime, start_layer, original_prev_assignment)
+            actions_in_chunk = []
+
+            for l in range(start_layer, end_layer + 1):
+                # get action for the current state using the policy
+                act = self._get_policy_action(curr_state)
+                actions_in_chunk.append(act)
+
+                # update state for next layer: keep BW/cloudtime, increment layer, set prev_action = act
+                curr_state = (state_bw, state_ctime, l + 1, act)
+
+            # majority vote
+            if actions_in_chunk:
+                counter = Counter(actions_in_chunk)
+                max_count = max(counter.values())
+                # collect all actions that have the highest frequency
+                majority_actions = [a for a, cnt in counter.items() if cnt == max_count]
+                if len(majority_actions) == 1:
+                    chosen_action = majority_actions[0]
+                else:
+                    # tie → fallback to the previous assignment of the first layer
+                    chosen_action = original_prev_assignment
+            else:
+                # empty chunk (should not happen), fallback
+                chosen_action = original_prev_assignment
+
+            # cache the result for this chunk and return it
+            self.group_range_assignments[cache_key] = chosen_action
+            return chosen_action
+
+        # ---------- No grouping: original single‑layer selection ----------
         actions = self._get_possible_actions(layer)
-        state_key = self._state_to_key(state)        
-        
-        # Compute preferences and softmax probabilities
+        state_key = self._state_to_key(state)
+
         preferences = []
         for action in actions:
             akey = self._action_to_key(action)
             pref = self.policy_table.get((state_key, akey), 0.0)
             preferences.append(pref)
         preferences = np.array(preferences)
-        
+
         scaled = preferences / max(self.temperature, 1e-8)
         scaled -= np.max(scaled)
         probs = np.exp(scaled) / np.sum(np.exp(scaled))
-        
+
         if self.is_test:
             best_idx = int(np.argmax(probs))
             chosen_action = actions[best_idx]
         else:
             chosen_idx = np.random.choice(len(actions), p=probs)
             chosen_action = actions[chosen_idx]
-        
-        # # Cache the chosen action for this group
-        # if num_groups is not None and num_groups > 0:
-        #     self.group_range_assignments[cache_key] = chosen_action
-        
+
         return chosen_action
-    
+
+    # ----------------------------------------------------------------------
+    # Helper methods (add to your class)
+    # ----------------------------------------------------------------------
+    def _get_chunk_range(self, chunk_idx, num_groups):
+        """Return (start_layer, end_layer) inclusive for the given chunk index."""
+        total_layers = len(self.profiling.layers)
+        layers_per_chunk = max(1, total_layers // num_groups)
+        start = chunk_idx * layers_per_chunk
+        end = min((chunk_idx + 1) * layers_per_chunk, total_layers) - 1
+        return start, end
+
+    def _get_policy_action(self, state):
+        """
+        Given a state tuple (bw, cloud_ctime, layer, prev_action),
+        return an action according to the current policy (softmax, temperature, test mode).
+        """
+        actions = self._get_possible_actions(int(state[2]))
+        state_key = self._state_to_key(state)
+
+        preferences = []
+        for action in actions:
+            akey = self._action_to_key(action)
+            pref = self.policy_table.get((state_key, akey), 0.0)
+            preferences.append(pref)
+        preferences = np.array(preferences)
+
+        scaled = preferences / max(self.temperature, 1e-8)
+        scaled -= np.max(scaled)
+        probs = np.exp(scaled) / np.sum(np.exp(scaled))
+
+        if self.is_test:
+            best_idx = int(np.argmax(probs))
+            return actions[best_idx]
+        else:
+            chosen_idx = np.random.choice(len(actions), p=probs)
+            return actions[chosen_idx]
     # -------------------------------------------------------------------------
     # Environment Step
     # -------------------------------------------------------------------------
