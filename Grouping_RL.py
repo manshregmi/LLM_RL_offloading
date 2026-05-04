@@ -73,8 +73,8 @@ CONT_BIN_EDGES = np.linspace(0, 20.0, NUM_CONT_BINS + 1)  # ms
 # Entropy-style exploration: softmax temperature over policy logits.
 # Higher temperature -> more random early; anneals down over training.
 TEMP_START = 2.0
-TEMP_END = 0.3
-TEMP_DECAY_STEPS = 32000
+TEMP_END = 0.1
+TEMP_DECAY_STEPS = 8000
 
 # Epsilon-greedy floor: probability of picking a uniformly random action,
 # independent of the softmax policy. Provides an exploration safety net so the

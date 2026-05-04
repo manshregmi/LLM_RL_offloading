@@ -156,14 +156,14 @@ if __name__ == "__main__":
     pipleline_overhead_time = []
 
     for n in range(1,2,2):
-        try:
-            os.remove("a2c_tables.pkl")
-        except FileNotFoundError:
-            pass   # Ignore if file doesn’t exist (like rm -f)
-        try:
-            os.remove("grouping_rl_tables.pkl")
-        except FileNotFoundError:
-            pass   # Ignore if file doesn’t exist (like rm -f)
+        # try:
+        #     os.remove("a2c_tables.pkl")
+        # except FileNotFoundError:
+        #     pass   # Ignore if file doesn’t exist (like rm -f)
+        # try:
+        #     os.remove("grouping_rl_tables.pkl")
+        # except FileNotFoundError:
+        #     pass   # Ignore if file doesn’t exist (like rm -f)
         
         cascaded_profiling_data = cascade_profiling(profiling_data,n=n)  # Create 3 copies for pipelining
         print(f"✅ Loaded profiling data")
@@ -174,7 +174,7 @@ if __name__ == "__main__":
         print("=" * 80)
         
         # Define number of episodes for training and baselines
-        TRAIN_EPISODES = 1000
+        TRAIN_EPISODES = 100000
         BASELINE_EPISODES = 1
         
         # # Run baseline schedulers
