@@ -54,11 +54,6 @@ ALPHA_POLICY = 0.05                 # policy table learning rate
 ALPHA_VALUE = 0.1                   # value table learning rate (higher: critic
                                     # should track value faster than actor changes)
 
-# --- Action space ---
-K_MIN = 3                           # minimum groups: LLaMA1, LLaMA2, BART
-K_MAX = 399                         # maximum groups (just under 400 layers)
-NUM_ACTIONS = K_MAX - K_MIN + 1     # 397 possible K values
-
 # --- State discretization ---
 # 10 bins per dimension -> 100 states. Coarse enough for fast convergence,
 # fine enough to capture meaningful (bw, contention) variation.
@@ -101,7 +96,7 @@ class GroupingRL:
                  B: int = B, 
                  L: int = L, 
                  phi: int = PHI, 
-                 num_actions=NUM_ACTIONS,
+                 num_actions=len(get_k_values(B, L, PHI)),
                  gamma=GAMMA,
                  alpha_policy=ALPHA_POLICY,
                  alpha_value=ALPHA_VALUE,
