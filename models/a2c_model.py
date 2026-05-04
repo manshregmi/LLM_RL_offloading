@@ -87,12 +87,12 @@ class TabularActorCriticAgent:
     def choose_action(self, state, num_groups=None):
         layer = int(state[2])
 
-        # Group caching: if we already have an action for this group, reuse it
-        if num_groups is not None and num_groups > 0:
-            chunk_idx = self._get_chunk_index(layer, num_groups)
-            cache_key = (num_groups, chunk_idx)
-            if cache_key in self.group_range_assignments:
-                return self.group_range_assignments[cache_key]
+        # # Group caching: if we already have an action for this group, reuse it
+        # if num_groups is not None and num_groups > 0:
+        #     chunk_idx = self._get_chunk_index(layer, num_groups)
+        #     cache_key = (num_groups, chunk_idx)
+        #     if cache_key in self.group_range_assignments:
+        #         return self.group_range_assignments[cache_key]
             
 
         actions = self._get_possible_actions(layer)
@@ -117,9 +117,9 @@ class TabularActorCriticAgent:
             chosen_idx = np.random.choice(len(actions), p=probs)
             chosen_action = actions[chosen_idx]
         
-        # Cache the chosen action for this group
-        if num_groups is not None and num_groups > 0:
-            self.group_range_assignments[cache_key] = chosen_action
+        # # Cache the chosen action for this group
+        # if num_groups is not None and num_groups > 0:
+        #     self.group_range_assignments[cache_key] = chosen_action
         
         return chosen_action
     

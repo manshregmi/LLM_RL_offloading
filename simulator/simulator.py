@@ -96,11 +96,17 @@ def get_contention_data(contention_csv_path, n_yolos_inference, n_llama_inferenc
             "Bart contention": 0.0
         }
 
+    # return {
+    #     "Llama contention ": float(row.iloc[0]['Llama contention']),
+    #     "Yolos contention": float(row.iloc[0]['Yolos contention']),
+    #     "Bart contention": float(row.iloc[0]['Bart contention'])
+    # }
+
     return {
-        "Llama contention ": float(row.iloc[0]['Llama contention']),
-        "Yolos contention": float(row.iloc[0]['Yolos contention']),
-        "Bart contention": float(row.iloc[0]['Bart contention'])
-    }
+            "Llama contention ": 0.0,
+            "Yolos contention": 0.0,
+            "Bart contention": 0.0
+        }
 
 # ==================== CLOUD EDGE SIMULATOR - PURE LATENCY ====================
 
@@ -151,15 +157,15 @@ class CloudEdgeSimulator:
 
     def get_current_bandwidth(self) -> float:
         """Get current bandwidth in MBps (Megabytes per second)"""
-        if self.bandwidth_tracker:
-            query_time = float(self.cumulative_time_seconds + self.episode_offset)
-            bw_mbps = self.bandwidth_tracker.get_bandwidth_at_time(
-                query_time,
-                use_normalized=True
-            )
-            return float(bw_mbps / 8.0)  # Convert to MBps
+        # if self.bandwidth_tracker:
+        #     query_time = float(self.cumulative_time_seconds + self.episode_offset)
+        #     bw_mbps = self.bandwidth_tracker.get_bandwidth_at_time(
+        #         query_time,
+        #         use_normalized=True
+        #     )
+        #     return float(bw_mbps / 8.0)  # Convert to MBps
         # return float(random.uniform(5, 100))
-        # return 100
+        return 10
 
     # ================= Action Space =================
 
