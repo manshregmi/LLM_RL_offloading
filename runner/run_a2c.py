@@ -332,35 +332,3 @@ def plot_assignment_percentages():
     # plt.tight_layout()
     plt.savefig("assignment_percentages.png", dpi=600)
     plt.show()
-
-# if __name__ == "__main__":
-    # Load your profiling data. Adjust the import/path accordingly.
-    # Example: from profiling.llm_profiling import get_LLM_profiling_data
-    # profiling_data = get_LLM_profiling_data()
-    # For now, we assume profiling_data is already available.
-    # If not, you need to create it before calling train_a2c_agent.
-    
-    # Train
-    # trained_agent, latencies, rewards = train_a2c_agent(profiling_data)
-    
-    # Evaluate and collect assignments
-    # eval_latencies, eval_rewards, assignment_counts = evaluate_agent(trained_agent, num_episodes=500)
-    
-    # Save results (optional)
-    # np.savez("pure_latency_results.npz",
-    #          training_latencies=latencies,
-    #          training_rewards=rewards,
-    #          eval_latencies=eval_latencies,
-    #          eval_rewards=eval_rewards)
-    
-    # Compute percentages per segment
-    # segments = aggregate_assignments_by_segment(assignment_counts)
-    
-    # print("\nAssignment percentages per model segment:")
-    # for seg, data in segments.items():
-    #     print(f"{seg:20s}: Edge {data['edge_pct']:.1f}% | Cloud {data['cloud_pct']:.1f}%")
-    
-    # Plot the graph
-    # plot_assignment_percentages(segments)
-    
-    # For demonstration, uncomment the lines above and provide your profiling_data.
