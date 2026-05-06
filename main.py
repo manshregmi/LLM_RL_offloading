@@ -115,8 +115,8 @@ def moving_average(data, window):
     """Compute moving average with given window size."""
     return np.convolve(data, np.ones(window)/window, mode='valid')
 
-def plot_convergence_curve(episode_rewards, window=100, title="", 
-                           xlabel="Episode", ylabel="Reward", save_path="/Users/Manish/Desktop/LLM_RL_offloading/"):
+def plot_convergence_curve(episode_rewards, window=200, title="", 
+                           xlabel="Episode", ylabel="Reward", save_path="/Users/ayushmarasini/Downloads/LLM/LLM_RL_offloading/"):
     """
     Plot smoothed convergence curve of episode rewards (or latencies).
     
@@ -174,7 +174,7 @@ if __name__ == "__main__":
         print("=" * 80)
         
         # Define number of episodes for training and baselines
-        TRAIN_EPISODES = 100000
+        TRAIN_EPISODES = 1000000
         BASELINE_EPISODES = 1
         
         # # Run baseline schedulers
@@ -207,11 +207,11 @@ if __name__ == "__main__":
     # )
     # latencies_ms, rewards, assignment_counts = evaluate_agent(agent, num_episodes=1000)
 
-    # plot_convergence_curve(episode_rewards)
+    plot_convergence_curve(episode_rewards)
 
     # segments = aggregate_assignments_by_segment(assignment_counts)
 
-    plot_assignment_percentages()
+    # plot_assignment_percentages()
 
 
 
