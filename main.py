@@ -5,6 +5,7 @@ Main execution script for Pure Latency Minimization with Actor-Critic and Baseli
 import numpy as np
 import pandas as pd
 import os
+from models.coarse_grained_a2c import OneShotTabularA2C
 from profiling.cascade_profiling_data import cascade_profiling
 from profiling.initialize_agx_profiling import get_LLM_profiling_data
 from runner.run_a2c import aggregate_assignments_by_segment, evaluate_agent, plot_assignment_percentages, train_a2c_agent
@@ -174,7 +175,7 @@ if __name__ == "__main__":
         print("=" * 80)
         
         # Define number of episodes for training and baselines
-        TRAIN_EPISODES = 1000000
+        TRAIN_EPISODES = 1000
         BASELINE_EPISODES = 1
         
         # # Run baseline schedulers
@@ -188,16 +189,26 @@ if __name__ == "__main__":
         print("TRAINING A2C AGENT")
         print("=" * 80)
         
-        agent, episode_latencies, episode_rewards, overhead_time = train_a2c_agent(
-            profiling_data=cascaded_profiling_data,
-            episodes=TRAIN_EPISODES,
-            is_test=True,           # Training mode
-            verbose=False,            # Print progress
-            total_pipelines=n
-        )
-        pipleline_overhead_time.append(overhead_time)
-        print(f"Pipeline overhead time for {n} pipelines: {overhead_time:.2f} ms")
-    pd.DataFrame(pipleline_overhead_time).to_csv('pipeline_overhead.csv', index=False, header=False)
+        # agent, episode_latencies, episode_rewards, overhead_time = train_a2c_agent(
+        #     profiling_data=cascaded_profiling_data,
+        #     episodes=TRAIN_EPISODES,
+        #     is_test=True,           # Training mode
+        #     verbose=False,            # Print progress
+        #     total_pipelines=n
+        # )
+        coarse_grained_latencies = []
+        agent = OneShotTabularA2C(profiling_data, alpha_actor=0.02, alpha_critic=0.05)
+        episode_overhead_times = []
+        for episode in range(TRAIN_EPISODES):
+            agent.start_episode()
+            total_latency_ms, total_reward, overhead_time = agent.run_episode()
+            coarse_grained_latencies.append(total_latency_ms)
+            episode_overhead_times.append(overhead_time)
+        print("coarse grained latencies:", np.mean(coarse_grained_latencies), np.std(coarse_grained_latencies), np.min(coarse_grained_latencies), np.max(coarse_grained_latencies))
+        print("episode overhead times:", np.mean(episode_overhead_times[100:]), np.std(episode_overhead_times[100:]), np.min(episode_overhead_times), np.max(episode_overhead_times))
+        # pipleline_overhead_time.append(overhead_time)
+        # print(f"Pipeline overhead time for {n} pipelines: {overhead_time:.2f} ms")
+    # pd.DataFrame(pipleline_overhead_time).to_csv('pipeline_overhead.csv', index=False, header=False)
 
     # agent_dq, episode_latencies_dq, episode_rewards_dq = train_double_q_agent(
     #     profiling_data=profiling_data,
@@ -207,7 +218,7 @@ if __name__ == "__main__":
     # )
     # latencies_ms, rewards, assignment_counts = evaluate_agent(agent, num_episodes=1000)
 
-    plot_convergence_curve(episode_rewards)
+    # plot_convergence_curve(episode_rewards)
 
     # segments = aggregate_assignments_by_segment(assignment_counts)
 

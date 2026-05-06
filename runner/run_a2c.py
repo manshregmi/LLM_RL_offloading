@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
 from Grouping_RL import GroupingRL
+from models.a2c_model_wo_voting import TabularActorCriticAgentWithoutVoting
 from profiling.profiling_class import ProfilingData
 from models.a2c_model import TabularActorCriticAgent
 # Adjust import for your profiling data function as needed
@@ -25,7 +26,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
     """Main training loop."""
     
     # Create agent
-    agent = TabularActorCriticAgent(
+    agent = TabularActorCriticAgentWithoutVoting(
         profiling_data=profiling_data,
         is_test=is_test,
         alpha_actor=0.02,
