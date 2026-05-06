@@ -175,7 +175,7 @@ if __name__ == "__main__":
         print("=" * 80)
         
         # Define number of episodes for training and baselines
-        TRAIN_EPISODES = 1000
+        TRAIN_EPISODES = 10000
         BASELINE_EPISODES = 1
         
         # # Run baseline schedulers
@@ -198,12 +198,14 @@ if __name__ == "__main__":
         # )
         coarse_grained_latencies = []
         agent = OneShotTabularA2C(profiling_data, alpha_actor=0.02, alpha_critic=0.05)
+        agent.load()
         episode_overhead_times = []
         for episode in range(TRAIN_EPISODES):
             agent.start_episode()
             total_latency_ms, total_reward, overhead_time = agent.run_episode()
             coarse_grained_latencies.append(total_latency_ms)
             episode_overhead_times.append(overhead_time)
+        agent.save()
         print("coarse grained latencies:", np.mean(coarse_grained_latencies), np.std(coarse_grained_latencies), np.min(coarse_grained_latencies), np.max(coarse_grained_latencies))
         print("episode overhead times:", np.mean(episode_overhead_times[100:]), np.std(episode_overhead_times[100:]), np.min(episode_overhead_times), np.max(episode_overhead_times))
         # pipleline_overhead_time.append(overhead_time)
