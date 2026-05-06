@@ -86,8 +86,10 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         episode_number_of_groups.append(number_of_groups)
         # Run episode
         action_array = []
+        count = 0
         while not done:
-            action, reward, latency_s, next_state, done, overhead_time_per_step = agent.step(state, num_groups=number_of_groups)
+            action, reward, latency_s, next_state, done, overhead_time_per_step, cached_count = agent.step(state, num_groups=number_of_groups, count=count)
+            count = cached_count
             step_overhead_time.append(overhead_time_per_step)
             action_array.append(action)
             rewards_ep += reward
@@ -98,6 +100,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
             td_errors.append(td_error)
             state = next_state
             step_count += 1
+        # print(f"there are {cached_count} cached actions for {number_of_groups} groups")  
         episode_overhead_time.append(np.sum(step_overhead_time))
         average_step_overhead_times.append(np.mean(step_overhead_time))
 
@@ -163,7 +166,8 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
     print(f"Mean number of groups per episode: {np.mean(episode_number_of_groups):.4f}")
     print(f"Std number of groups per episode: {np.std(episode_number_of_groups):.4f}")
 
-    plt.plot(episode_number_of_groups)
+    # plt.plot(episode_number_of_groups)
+    plt.plot(moving_average(episode_number_of_groups,300))
     plt.xlabel("Episode")
     plt.ylabel("Number of Groups")
     plt.title("Number of Groups per Episode")
@@ -172,6 +176,10 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
 
 
     return agent, episode_latencies, episode_rewards, np.mean(episode_overhead_time[100:])
+
+def moving_average(data, window):
+    """Compute moving average with given window size."""
+    return np.convolve(data, np.ones(window)/window, mode='valid')
 
 def evaluate_agent(agent, num_episodes=100):
     """

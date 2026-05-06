@@ -6,6 +6,8 @@ from bisect import bisect_left
 from typing import List, Tuple, Optional
 from profiling.profiling_class import ProfilingData
 
+contention_csv_path = os.path.join("simulator", "contention.csv")
+df_contention = pd.read_csv(contention_csv_path)
 
 # ==================== BANDWIDTH TRACKER ====================
 
@@ -81,12 +83,11 @@ def load_bandwidth_data_from_csv(csv_path: str) -> List[Tuple[float, float]]:
 
 
 def get_contention_data(contention_csv_path, n_yolos_inference, n_llama_inference, n_bart_inference):
-    df = pd.read_csv(contention_csv_path)
 
-    row = df[
-        (df['n_yolos'] == n_yolos_inference) &
-        (df['n_llama'] == n_llama_inference) &
-        (df['n_bart'] == n_bart_inference)
+    row = df_contention[
+        (df_contention['n_yolos'] == n_yolos_inference) &
+        (df_contention['n_llama'] == n_llama_inference) &
+        (df_contention['n_bart'] == n_bart_inference)
     ]
 
     if row.empty:
@@ -157,8 +158,9 @@ class CloudEdgeSimulator:
                 query_time,
                 use_normalized=True
             )
-            return float(bw_mbps / 8.0)  # Convert to MBps
-        return float(random.uniform(5, 100))
+            return float(bw_mbps / 8.0)  # Convert to
+        # return float(random.uniform(5, 100))
+        return 12 
 
     # ================= Action Space =================
 
@@ -198,22 +200,22 @@ class CloudEdgeSimulator:
         cloud_nodes = np.where(current_action[:, 1] == 1)[0]
 
         if (not isAllCloud):
-            if (random.random() < 0.2):
+            if (random.random() < 0.05):
                 self.i +=1
                 self.i = min(self.i, 3)
-            elif (random.random() < 0.2):
+            elif (random.random() < 0.05):
                 self.i -=1
                 self.i = max(self.i, 0)
-            if (random.random() < 0.2):
+            if (random.random() < 0.05):
                 self.j +=1
                 self.j = min(self.j, 3)
-            elif (random.random() < 0.2):
+            elif (random.random() < 0.05):
                 self.j -=1
                 self.j = max(self.j, 0)
-            if (random.random() < 0.2):
+            if (random.random() < 0.05):
                 self.k +=1
                 self.k = min(self.k, 3)
-            elif (random.random() < 0.2):
+            elif (random.random() < 0.05):
                 self.k -=1
                 self.k = max(self.k, 0)
 
@@ -295,19 +297,19 @@ class CloudEdgeSimulator:
         if layer + 1 < len(self.profiling.layers):
             terminal = False
             if 20 < layer < 100:
-                if np.random.rand() < 0.01:
+                if np.random.rand() < 0.05:
                     next_layer = 100
                 else:
                     next_layer = layer + 1
  
             elif 180 < layer < 300:
-                if np.random.rand() < 0.01:
+                if np.random.rand() < 0.05:
                     next_layer = 300
                 else:
                     next_layer = layer + 1
  
             elif 350 < layer < 400:
-                if np.random.rand() < 0.01:
+                if np.random.rand() < 0.05:
                     next_layer = 400
                     terminal = True
                 else:
