@@ -207,7 +207,7 @@ if __name__ == "__main__":
             episode_overhead_times.append(overhead_time)
         agent.save()
         print("coarse grained latencies:", np.mean(coarse_grained_latencies), np.std(coarse_grained_latencies), np.min(coarse_grained_latencies), np.max(coarse_grained_latencies))
-        print("episode overhead times:", np.mean(episode_overhead_times[100:]), np.std(episode_overhead_times[100:]), np.min(episode_overhead_times), np.max(episode_overhead_times))
+        print("episode overhead times:", np.mean(episode_overhead_times[500:]), np.std(episode_overhead_times[500:]), np.min(episode_overhead_times), np.max(episode_overhead_times))
         # pipleline_overhead_time.append(overhead_time)
         # print(f"Pipeline overhead time for {n} pipelines: {overhead_time:.2f} ms")
     # pd.DataFrame(pipleline_overhead_time).to_csv('pipeline_overhead.csv', index=False, header=False)
