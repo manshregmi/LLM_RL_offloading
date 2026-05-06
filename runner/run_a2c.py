@@ -35,7 +35,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         total_pipelines=total_pipelines
     )
 
-    grouping_RL_agent = GroupingRL(total_pipelines=total_pipelines)
+    # grouping_RL_agent = GroupingRL(total_pipelines=total_pipelines)
     
     # Training parameters
     NUM_EPISODES = episodes
@@ -65,7 +65,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
     average_last_pipeline_contention = 0.0
     state = (bandwidth, cloud_contention, 0, None)  # Start at layer 0 with no previous assignment
     agent.load()  # Load existing model if available
-    grouping_RL_agent.load()  # Load grouping agent if it has a saved state
+    # grouping_RL_agent.load()  # Load grouping agent if it has a saved state
     episode_overhead_time = []
     average_step_overhead_times = []
     episode_number_of_groups = []
@@ -80,15 +80,16 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         step_overhead_time = []
         last_pipeline_contention.append(state[1])
         
-        number_of_groups = grouping_RL_agent.train(bandwidth, average_last_pipeline_contention)
+        # number_of_groups = grouping_RL_agent.train(bandwidth, average_last_pipeline_contention)
         # print("number of groups: ", number_of_groups)
         # print("average_last_pipeline_contention: ", average_last_pipeline_contention)
-        episode_number_of_groups.append(number_of_groups)
+        # episode_number_of_groups.append(number_of_groups)
         # Run episode
         action_array = []
         count = 0
         while not done:
-            action, reward, latency_s, next_state, done, overhead_time_per_step, cached_count = agent.step(state, num_groups=number_of_groups, count=count)
+            action, reward, latency_s, next_state, done, overhead_time_per_step, cached_count = agent.step(state, #num_groups=number_of_groups, 
+                                                                                                           count=count)
             count = cached_count
             step_overhead_time.append(overhead_time_per_step)
             action_array.append(action)
@@ -112,16 +113,16 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         episode_latencies.append(total_latency_ms)
         episode_rewards.append(total_reward)
         
-        grouping_RL_agent._update_tables(
-            state_key=grouping_RL_agent.last_state_key,
-            action_key=grouping_RL_agent.last_action_key,
-            reward=total_reward,
-            next_state_key=None,
-            done=True
-            )
+        # grouping_RL_agent._update_tables(
+        #     state_key=grouping_RL_agent.last_state_key,
+        #     action_key=grouping_RL_agent.last_action_key,
+        #     reward=total_reward,
+        #     next_state_key=None,
+        #     done=True
+        #     )
         
-        if (episode % 100)== 0:
-            grouping_RL_agent.save()  # Save grouping agent state after each episode
+        # if (episode % 100)== 0:
+        #     grouping_RL_agent.save()  # Save grouping agent state after each episode
 
 
 

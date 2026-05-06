@@ -138,6 +138,7 @@ def train_double_q_agent(profiling_data: ProfilingData,
 
     # Final save
     agent.save()
+    
 
     print("\n" + "=" * 80)
     print("Overhead statistics:")
