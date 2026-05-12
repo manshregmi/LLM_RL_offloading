@@ -1,5 +1,5 @@
 import csv
-
+import os 
 def read_prefill_dec_values(csv_filepath):
     """
     Reads the CSV file row by row and outputs prefill_dec_iprof_ms values
@@ -8,20 +8,22 @@ def read_prefill_dec_values(csv_filepath):
     with open(csv_filepath, 'r') as file:
         reader = csv.DictReader(file)
         
-        seq_counter = 0
+        seq_counter = 100
         for row in reader:
-            prefill_dec_value = float(row['step_iprof_ms'])
+            prefill_dec_value = float(row['step_total_ms'])
             # input_mbit = float(row['input_mbit'])
-            # kv_cache_mbit = float(row['kv_cache_mbit'])
+            # input_mbit = float(row['dec_input_mbit'])
+            # kv_cache_mbit = float(row['self_kv_cache_mbit'])
             # cross_kv_mbit = float(row['cross_kv_mbit'])
             
 
 
-            print(f"({seq_counter},0): {prefill_dec_value},")
-            # print(f"({seq_counter},0): {(input_mbit+kv_cache_mbit)/8},")
+            print(f"({seq_counter},1): {prefill_dec_value},")
+            # print(f"({seq_counter},0): {(input_mbit+kv_cache_mbit+cross_kv_mbit)/8},")
 
             seq_counter += 1
 
 if __name__ == "__main__":
-    csv_filepath = "/Users/Manish/Downloads/llama_autoregressive_kv_cache_jetpack51_100.csv"
+    # csv_filepath = os.path.join("bart_summary_profiling_400.csv")
+    csv_filepath = r"C:\Users\SIU856622975\Desktop\bart_summary_profiling_50.csv"
     read_prefill_dec_values(csv_filepath)
