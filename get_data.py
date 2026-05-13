@@ -8,7 +8,7 @@ def read_prefill_dec_values(csv_filepath):
     with open(csv_filepath, 'r') as file:
         reader = csv.DictReader(file)
         
-        seq_counter = 100
+        seq_counter = 150
         for row in reader:
             prefill_dec_value = float(row['step_total_ms'])
             # input_mbit = float(row['input_mbit'])
@@ -18,12 +18,15 @@ def read_prefill_dec_values(csv_filepath):
             
 
 
-            print(f"({seq_counter},1): {prefill_dec_value},")
+            print(f"({seq_counter},0): {prefill_dec_value},")
             # print(f"({seq_counter},0): {(input_mbit+kv_cache_mbit+cross_kv_mbit)/8},")
 
             seq_counter += 1
 
 if __name__ == "__main__":
     # csv_filepath = os.path.join("bart_summary_profiling_400.csv")
-    csv_filepath = r"C:\Users\SIU856622975\Desktop\bart_summary_profiling_50.csv"
+    csv_filepath = r"C:\Users\SIU856622975\Desktop\bart_summary_profiling_200_agx.csv"
+    # csv_filepath = r"C:\Users\SIU856622975\Downloads\llama_autoregressive_kv_cache_jetpack51_100.csv"
+
+
     read_prefill_dec_values(csv_filepath)
