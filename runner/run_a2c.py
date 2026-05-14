@@ -88,7 +88,9 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         action_array = []
         count = 0
         while not done:
-            action, reward, latency_s, next_state, done, overhead_time_per_step, cached_count = agent.step(state, num_groups=number_of_groups, count=count)
+            action, reward, latency_s, next_state, done, overhead_time_per_step, cached_count = agent.step(state, num_groups= number_of_groups , count=count)
+            # if (step_count < 2):
+            #     print("first two actions are:", action)
             count = cached_count
             step_overhead_time.append(overhead_time_per_step)
             action_array.append(action)
@@ -100,7 +102,8 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
             td_errors.append(td_error)
             state = next_state
             step_count += 1
-        # print(f"there are {cached_count} cached actions for {number_of_groups} groups")  
+        # print(f"there are {cached_count} cached actions for {number_of_groups} groups")
+        # print("Assignment Vector",action_array)  
         episode_overhead_time.append(np.sum(step_overhead_time))
         average_step_overhead_times.append(np.mean(step_overhead_time))
 
@@ -166,13 +169,13 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
     print(f"Mean number of groups per episode: {np.mean(episode_number_of_groups):.4f}")
     print(f"Std number of groups per episode: {np.std(episode_number_of_groups):.4f}")
 
-    # plt.plot(episode_number_of_groups)
-    plt.plot(moving_average(episode_number_of_groups,300))
-    plt.xlabel("Episode")
-    plt.ylabel("Number of Groups")
-    plt.title("Number of Groups per Episode")
-    plt.savefig("number_of_groups_per_episode.png", dpi=600)
-    plt.show()
+    # # plt.plot(episode_number_of_groups)
+    # plt.plot(moving_average(episode_number_of_groups,300))
+    # plt.xlabel("Episode")
+    # plt.ylabel("Number of Groups")
+    # plt.title("Number of Groups per Episode")
+    # plt.savefig("number_of_groups_per_episode.png", dpi=600)
+    # plt.show()
 
 
     return agent, episode_latencies, episode_rewards, np.mean(episode_overhead_time[100:])

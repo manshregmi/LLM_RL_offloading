@@ -176,7 +176,7 @@ if __name__ == "__main__":
         # print("=" * 80)
         
         # Define number of episodes for training and baselines
-        TRAIN_EPISODES = 10000
+        TRAIN_EPISODES = 100000
         BASELINE_EPISODES = 1
         
         # # Run baseline schedulers
@@ -199,8 +199,8 @@ if __name__ == "__main__":
             total_pipelines=n
         )
         pipleline_overhead_time.append(overhead_time)
-        print(f"Pipeline overhead time for {n} pipelines: {overhead_time:.2f} ms")
-    pd.DataFrame(pipleline_overhead_time).to_csv('pipeline_overhead.csv', index=False, header=False)
+        # print(f"Pipeline overhead time for {n} pipelines: {overhead_time:.2f} ms")
+    # pd.DataFrame(pipleline_overhead_time).to_csv('pipeline_overhead.csv', index=False, header=False)
 
     # agent_dq, episode_latencies_dq, episode_rewards_dq = train_double_q_agent(
     #     profiling_data=profiling_data,
