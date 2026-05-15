@@ -302,24 +302,37 @@ class CloudEdgeSimulator:
             if 70 < layer < 97:
                 if np.random.rand() < 0.075:
                     self.isEos2 = True
-                next_layer = layer + 1
-            elif 98 < layer < 150 :
-                self.isEos2 = False
-                next_layer = layer + 1
-            elif 150 < layer < 200:
-                if np.random.rand() < 0.075:
-                    self.isEos1 = True
-                    self.isEos2 = True
-                if (self.isEos1):
-                    next_layer = 200
+                if  np.random.rand() < 0.075:       
+                    self.isEos1 = True  
+
+                if (self.isEos1 and  self.isEos2):
+                    next_layer = 100
+                    self.isEos1 = False 
+                    self.isEos2 = False
                 else:
                     next_layer = layer + 1
- 
-            elif 300 < layer < 400:
-                self.isEos2 = False
-                self.isEos1 = False
+            elif 98 < layer < 129 :
+                self.isEos1 =False
+                self.isEos2 =False  
+                next_layer = layer + 1
+            elif 130 < layer < 150:
                 if np.random.rand() < 0.075:
-                    next_layer = 400
+                    self.isEos1 = True
+                if np.random.rand() <0.075:    
+                    self.isEos2 = True
+                if (self.isEos1 and  self.isEos2):
+                    next_layer = 150
+                    self.isEos1 = False 
+                    self.isEos2 = False
+                else:
+                    next_layer = layer + 1
+            elif 150< layer < 219: 
+                self.isEos1 =False
+                self.isEos2 =False  
+                next_layer = layer + 1
+            elif 220 < layer < 250:
+                if np.random.rand() < 0.075:
+                    next_layer = 250
                     terminal = True
                 else:
                   next_layer = layer + 1
@@ -332,10 +345,10 @@ class CloudEdgeSimulator:
             terminal = True
 
         
-        if (self.isEos1):
-            self.isEos1, self.isEos2 = False, False
-            if (layer < 200):
-                next_layer = 200
+        # if (self.isEos1):
+        #     self.isEos1, self.isEos2 = False, False
+        #     if (layer < 100):
+        #         next_layer = 100
         
        
         # Convert previous action to pattern for next state
@@ -392,7 +405,8 @@ class CloudEdgeSimulator:
             prev_layer_nodes = len(prev_assignments)
 
             for curr_node in range(len(curr_assignments)):
-                if  not (self.isEos2 and curr_node > 1):
+
+                if  (not (self.isEos2 and (not self.isEos1) and curr_node > 0)) or (not ((not self.isEos2) and (self.isEos1) and curr_node < 1)):
                     parent_nodes = deps.get((layer, curr_node), [])
                     for (p_layer, p_node) in parent_nodes:
                         # SAFETY CHECK: Ensure parent is from previous layer and index in bounds
@@ -418,7 +432,7 @@ class CloudEdgeSimulator:
         else:
             # First layer: transmit input data to cloud if needed
             for i in range(len(current_action)):
-                if  not (self.isEos2 and i > 1):
+                if  (not ((not self.isEos2) and (self.isEos1) and i > 0)) or (not (self.isEos2 and (not self.isEos1) and i < 1)):
                     if current_action[i, 1] == 1:  # Cloud execution
                         transmission_time = max(
                             (profiling.get_input_size()) / max(bandwidth, 1e-6),
@@ -433,7 +447,7 @@ class CloudEdgeSimulator:
         edge_times = []
 
         for i in range(len(current_action)):
-            if  not (self.isEos2 and i < 1):
+            if  (not (self.isEos2  and (not self.isEos1) and  i > 0)) or (not ((not self.isEos2) and self.isEos1 and (i < 1))):
                 if current_action[i, 1] == 0:  # Edge execution
                     node_t_s = profiling.get_node_edge_time(layer, i) / 1000.0
                     edge_times.append(node_t_s)
@@ -446,8 +460,10 @@ class CloudEdgeSimulator:
         actual_idle_time_s = 0.0
         new_current_action = []
 
-        if   (self.isEos2):
+        if   (self.isEos2 and not self.isEos1):
             new_current_action = current_action[:1]
+        elif (not self.isEos2 and self.isEos1):
+            new_current_action = current_action[1:]
         else: 
             new_current_action = current_action
 

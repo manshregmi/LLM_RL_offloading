@@ -7,7 +7,7 @@ import pandas as pd
 import os
 from profiling.cascade_profiling_data import cascade_profiling
 from profiling.initialize_agx_profiling import get_LLM_profiling_data
-from profiling.initialize_graph2 import get_graph2
+from profiling.initialize_graph3 import get_graph3
 from runner.run_a2c import aggregate_assignments_by_segment, evaluate_agent, plot_assignment_percentages, train_a2c_agent
 from baselines.hurustic_baselines import run_scheduler 
 import matplotlib.pyplot  as plt
@@ -154,7 +154,7 @@ if __name__ == "__main__":
     print("LOADING PROFILING DATA")
     print("=" * 80)
     # profiling_data = get_LLM_profiling_data()
-    profiling_data = get_graph2()
+    profiling_data = get_graph3()
     pipleline_overhead_time = []
 
     for n in range(1,2,2):
@@ -176,7 +176,7 @@ if __name__ == "__main__":
         # print("=" * 80)
         
         # Define number of episodes for training and baselines
-        TRAIN_EPISODES = 100000
+        TRAIN_EPISODES = 10000
         BASELINE_EPISODES = 1
         
         # # Run baseline schedulers
