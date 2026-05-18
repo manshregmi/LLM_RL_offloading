@@ -349,8 +349,12 @@ class CloudEdgeSimulator:
         #     self.isEos1, self.isEos2 = False, False
         #     if (layer < 100):
         #         next_layer = 100
+
+        for i in range(len(action)):
+            number_of_op_tokens = self.profiling.get_num_op_tokens(layer, i)
+            if (not self.isEos1 or not self.isEos2 or (i == 0 and layer == 0)):
+                tokens += number_of_op_tokens                
         
-       
         # Convert previous action to pattern for next state
         prev_action_pattern = self._action_to_pattern(action)
        
