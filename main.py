@@ -174,7 +174,7 @@ if __name__ == "__main__":
         # print("=" * 80)
         
         # Define number of episodes for training and baselines
-        TRAIN_EPISODES = 10000
+        TRAIN_EPISODES = 100
         BASELINE_EPISODES = 1
         
         # # Run baseline schedulers
@@ -187,7 +187,7 @@ if __name__ == "__main__":
         print("\n" + "=" * 80)
         print("TRAINING A2C AGENT")
         print("=" * 80)
-        
+
         agent, episode_latencies, episode_rewards, overhead_time = train_a2c_agent(
             # profiling_data=cascaded_profiling_data,
             profiling_data = profiling_data,

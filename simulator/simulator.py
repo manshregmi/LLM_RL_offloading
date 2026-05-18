@@ -124,7 +124,8 @@ class CloudEdgeSimulator:
         self.j = random.randint(0, 3)
         self.k = random.randint(0, 3)
         self.isEos1 = False
-        self.isEos2 = False 
+        self.isEos2 = False
+        self.total_generated_tokens = 0
 
         self.total_pipeline = total_pipeline
         # Default bandwidth CSV path
@@ -351,9 +352,9 @@ class CloudEdgeSimulator:
         #         next_layer = 100
 
         for i in range(len(action)):
-            number_of_op_tokens = self.profiling.get_num_op_tokens(layer, i)
+            number_of_op_tokens = self.profiling.get_number_of_op_tokens(layer, i)
             if (not self.isEos1 or not self.isEos2 or (i == 0 and layer == 0)):
-                tokens += number_of_op_tokens                
+                self.total_generated_tokens += number_of_op_tokens                
         
         # Convert previous action to pattern for next state
         prev_action_pattern = self._action_to_pattern(action)
@@ -368,6 +369,15 @@ class CloudEdgeSimulator:
        
         return next_state, terminal
     
+    def get_total_generated_tokens(self, terminal):
+        total_tokens = self.total_generated_tokens
+        if (terminal):
+            self.total_generated_tokens = 0
+            return total_tokens
+        else:
+            return 0
+
+
     def _action_to_pattern(self, action):
         """
         Convert action matrix to a pattern representation.
