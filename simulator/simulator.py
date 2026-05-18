@@ -89,6 +89,7 @@ def get_contention_data(contention_csv_path, n_yolos_inference, n_llama_inferenc
         (df_contention['n_llama'] == n_llama_inference) &
         (df_contention['n_bart'] == n_bart_inference)
     ]
+  
 
     if row.empty:
         return {
@@ -122,6 +123,9 @@ class CloudEdgeSimulator:
         self.i = random.randint(0, 3)
         self.j = random.randint(0, 3)
         self.k = random.randint(0, 3)
+        self.isEos1 = False
+        self.isEos2 = False
+        self.total_generated_tokens = 0
 
         self.total_pipeline = total_pipeline
         # Default bandwidth CSV path
@@ -159,8 +163,8 @@ class CloudEdgeSimulator:
                 use_normalized=True
             )
             return float(bw_mbps / 8.0)  # Convert to
-        # return float(random.uniform(5, 100))
-        return 12 
+        return float(random.uniform(5, 100))
+        # return 12 
 
     # ================= Action Space =================
 
@@ -185,7 +189,6 @@ class CloudEdgeSimulator:
             for i in range(nodes):
                 a[i, 1] = (pattern >> i) & 1  # 0 = edge, 1 = cloud
             actions.append(a)
-
         return actions
 
     # ================= Cloud Waiting Time =================
@@ -292,25 +295,45 @@ class CloudEdgeSimulator:
        
         # Get current bandwidth
         current_bandwidth = self.get_current_bandwidth()
-       
+        
         # Check if this was the last layer
+
         if layer + 1 < len(self.profiling.layers):
             terminal = False
-            if 20 < layer < 100:
-                if np.random.rand() < 0.05:
+            if 70 < layer < 97:
+                if np.random.rand() < 0.075:
+                    self.isEos2 = True
+                if  np.random.rand() < 0.075:       
+                    self.isEos1 = True  
+
+                if (self.isEos1 and  self.isEos2):
                     next_layer = 100
+                    self.isEos1 = False 
+                    self.isEos2 = False
                 else:
                     next_layer = layer + 1
- 
-            elif 180 < layer < 300:
-                if np.random.rand() < 0.05:
-                    next_layer = 300
+            elif 98 < layer < 129 :
+                self.isEos1 =False
+                self.isEos2 =False  
+                next_layer = layer + 1
+            elif 130 < layer < 150:
+                if np.random.rand() < 0.075:
+                    self.isEos1 = True
+                if np.random.rand() <0.075:    
+                    self.isEos2 = True
+                if (self.isEos1 and  self.isEos2):
+                    next_layer = 150
+                    self.isEos1 = False 
+                    self.isEos2 = False
                 else:
                     next_layer = layer + 1
- 
-            elif 350 < layer < 400:
-                if np.random.rand() < 0.05:
-                    next_layer = 400
+            elif 150< layer < 219: 
+                self.isEos1 =False
+                self.isEos2 =False  
+                next_layer = layer + 1
+            elif 220 < layer < 250:
+                if np.random.rand() < 0.075:
+                    next_layer = 250
                     terminal = True
                 else:
                   next_layer = layer + 1
@@ -321,8 +344,18 @@ class CloudEdgeSimulator:
         else:
             next_layer = layer
             terminal = True
-        # print(f"Next layer: {next_layer}, Terminal: {terminal}")
-       
+
+        
+        # if (self.isEos1):
+        #     self.isEos1, self.isEos2 = False, False
+        #     if (layer < 100):
+        #         next_layer = 100
+
+        for i in range(len(action)):
+            number_of_op_tokens = self.profiling.get_number_of_op_tokens(layer, i)
+            if (not self.isEos1 or not self.isEos2 or (i == 0 and layer == 0)):
+                self.total_generated_tokens += number_of_op_tokens                
+        
         # Convert previous action to pattern for next state
         prev_action_pattern = self._action_to_pattern(action)
        
@@ -336,6 +369,15 @@ class CloudEdgeSimulator:
        
         return next_state, terminal
     
+    def get_total_generated_tokens(self, terminal):
+        total_tokens = self.total_generated_tokens
+        if (terminal):
+            self.total_generated_tokens = 0
+            return total_tokens
+        else:
+            return 0
+
+
     def _action_to_pattern(self, action):
         """
         Convert action matrix to a pattern representation.
@@ -377,37 +419,40 @@ class CloudEdgeSimulator:
             prev_layer_nodes = len(prev_assignments)
 
             for curr_node in range(len(curr_assignments)):
-                parent_nodes = deps.get((layer, curr_node), [])
-                for (p_layer, p_node) in parent_nodes:
-                    # SAFETY CHECK: Ensure parent is from previous layer and index in bounds
-                    if p_layer == layer - 1 and p_node < prev_layer_nodes:
-                        parent_loc = prev_assignments[p_node]
-                    else:
-                        # Parent from earlier layer or out of bounds, assume edge
-                        parent_loc = 0
-                        
-                    curr_loc = curr_assignments[curr_node]
 
-                    if parent_loc != curr_loc:
-                        # Data must be transmitted
-                        output_size = profiling.get_output_size(layer, curr_node)
+                if  (not (self.isEos2 and (not self.isEos1) and curr_node > 0)) or (not ((not self.isEos2) and (self.isEos1) and curr_node < 1)):
+                    parent_nodes = deps.get((layer, curr_node), [])
+                    for (p_layer, p_node) in parent_nodes:
+                        # SAFETY CHECK: Ensure parent is from previous layer and index in bounds
+                        if p_layer == layer - 1 and p_node < prev_layer_nodes:
+                            parent_loc = prev_assignments[p_node]
+                        else:
+                            # Parent from earlier layer or out of bounds, assume edge
+                            parent_loc = 0
+                            
+                        curr_loc = curr_assignments[curr_node]
 
-                        # Transmission time = data size / bandwidth (with RTT floor)
-                        transmission_time = max(
-                            (output_size) / max(bandwidth, 1e-6),
-                            profiling.rtt / 1000.0
-                        )
-                        transmission_times.append(transmission_time)
+                        if parent_loc != curr_loc:
+                            # Data must be transmitted
+                            output_size = profiling.get_output_size(layer, curr_node)
+
+                            # Transmission time = data size / bandwidth (with RTT floor)
+                            transmission_time = max(
+                                (output_size) / max(bandwidth, 1e-6),
+                                profiling.rtt / 1000.0
+                            )
+                            transmission_times.append(transmission_time)
 
         else:
             # First layer: transmit input data to cloud if needed
             for i in range(len(current_action)):
-                if current_action[i, 1] == 1:  # Cloud execution
-                    transmission_time = max(
-                        (profiling.get_input_size()) / max(bandwidth, 1e-6),
-                        profiling.rtt / 1000.0
-                    )
-                    transmission_times.append(transmission_time)
+                if  (not ((not self.isEos2) and (self.isEos1) and i > 0)) or (not (self.isEos2 and (not self.isEos1) and i < 1)):
+                    if current_action[i, 1] == 1:  # Cloud execution
+                        transmission_time = max(
+                            (profiling.get_input_size()) / max(bandwidth, 1e-6),
+                            profiling.rtt / 1000.0
+                        )
+                        transmission_times.append(transmission_time)
 
         # Maximum transmission time (parallel transmissions)
         max_transmission_time = max(transmission_times) if transmission_times else 0.0
@@ -416,9 +461,10 @@ class CloudEdgeSimulator:
         edge_times = []
 
         for i in range(len(current_action)):
-            if current_action[i, 1] == 0:  # Edge execution
-                node_t_s = profiling.get_node_edge_time(layer, i) / 1000.0
-                edge_times.append(node_t_s)
+            if  (not (self.isEos2  and (not self.isEos1) and  i > 0)) or (not ((not self.isEos2) and self.isEos1 and (i < 1))):
+                if current_action[i, 1] == 0:  # Edge execution
+                    node_t_s = profiling.get_node_edge_time(layer, i) / 1000.0
+                    edge_times.append(node_t_s)
 
 
        
@@ -426,8 +472,17 @@ class CloudEdgeSimulator:
 
         # ========== 3. CLOUD WAITING/IDLE TIME ==========
         actual_idle_time_s = 0.0
+        new_current_action = []
 
-        if np.any(current_action[:, 1] == 1):  # Any cloud execution
+        if   (self.isEos2 and not self.isEos1):
+            new_current_action = current_action[:1]
+        elif (not self.isEos2 and self.isEos1):
+            new_current_action = current_action[1:]
+        else: 
+            new_current_action = current_action
+
+
+        if np.any(new_current_action[:, 1] == 1):  # Any cloud execution
             cloud_pending_s = cloud_pending_ms / 1000.0
             # Edge may be idle while waiting for cloud
             actual_idle_time_s = max(0.0, cloud_pending_s - edge_total_time_s)
@@ -438,7 +493,7 @@ class CloudEdgeSimulator:
 
         # Update cumulative time
         self.cumulative_time_seconds += completion_time_s
-
+        # print(f"EOS1 {self.isEos1} and  EOS 2 {self.isEos2} has total time {completion_time_s*1000} for level {current_state[2]} and assignment vector is {current_action}", )
         return completion_time_s
 
     # ================= PURE LATENCY REWARD =================

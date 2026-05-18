@@ -69,6 +69,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
     episode_overhead_time = []
     average_step_overhead_times = []
     episode_number_of_groups = []
+    episode_generated_tokens= []
     for episode in range(NUM_EPISODES):
         rewards_ep = 0
         state = (bandwidth, cloud_contention, 0, None)
@@ -88,7 +89,12 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         action_array = []
         count = 0
         while not done:
-            action, reward, latency_s, next_state, done, overhead_time_per_step, cached_count = agent.step(state, num_groups=number_of_groups, count=count)
+            action, reward, latency_s, next_state, done, overhead_time_per_step, cached_count = agent.step(state, num_groups= number_of_groups , count=count)
+            # if (step_count < 2):
+            #     print("first two actions are:", action)
+            if(done):
+                total_generated_tokens = agent.simulator.get_total_generated_tokens(done)
+                episode_generated_tokens.append(total_generated_tokens)
             count = cached_count
             step_overhead_time.append(overhead_time_per_step)
             action_array.append(action)
@@ -100,7 +106,8 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
             td_errors.append(td_error)
             state = next_state
             step_count += 1
-        # print(f"there are {cached_count} cached actions for {number_of_groups} groups")  
+        # print(f"there are {cached_count} cached actions for {number_of_groups} groups")
+        # print("Assignment Vector",action_array)  
         episode_overhead_time.append(np.sum(step_overhead_time))
         average_step_overhead_times.append(np.mean(step_overhead_time))
 
@@ -155,6 +162,13 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
     print(f"Std overhead time per episode: {np.std(episode_overhead_time[100:])*1000:.4f}ms")
     print(f"Mean overhead time per step: {np.mean(average_step_overhead_times)*1000:.4f}ms")
 
+
+    print("\n" + "=" * 80)
+    print("Average time per token:")
+    print(f"Average time per token: {np.mean(episode_latencies)/np.mean(episode_generated_tokens):.4f}ms")
+    print(f" minimum time per token: {np.min(episode_latencies)/np.max(episode_generated_tokens):.4f}ms")
+    print(f" maximum time per token: {np.max(episode_latencies)/np.min(episode_generated_tokens):.4f}ms")
+
     print("=" * 80)
     print("TRAINING COMPLETE")
     print("=" * 80)
@@ -166,13 +180,13 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
     print(f"Mean number of groups per episode: {np.mean(episode_number_of_groups):.4f}")
     print(f"Std number of groups per episode: {np.std(episode_number_of_groups):.4f}")
 
-    # plt.plot(episode_number_of_groups)
-    plt.plot(moving_average(episode_number_of_groups,300))
-    plt.xlabel("Episode")
-    plt.ylabel("Number of Groups")
-    plt.title("Number of Groups per Episode")
-    plt.savefig("number_of_groups_per_episode.png", dpi=600)
-    plt.show()
+    # # plt.plot(episode_number_of_groups)
+    # plt.plot(moving_average(episode_number_of_groups,300))
+    # plt.xlabel("Episode")
+    # plt.ylabel("Number of Groups")
+    # plt.title("Number of Groups per Episode")
+    # plt.savefig("number_of_groups_per_episode.png", dpi=600)
+    # plt.show()
 
 
     return agent, episode_latencies, episode_rewards, np.mean(episode_overhead_time[100:])

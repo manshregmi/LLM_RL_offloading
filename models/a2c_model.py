@@ -134,15 +134,22 @@ class TabularActorCriticAgent:
 
             if cache_key in self.group_range_assignments:
                 count += 1   # optional debug counter
-                return self.group_range_assignments[cache_key], count
-
+                grouped_assignment= self.group_range_assignments[cache_key]
+                cached_assignment_vector = grouped_assignment[0][1]
+                cached_assignments = []
+                for _ in range(self.profiling.get_num_nodes(state[2])):
+                    cached_assignments.append([state[2], (1 if cached_assignment_vector > 0 else 0)])
+                return np.array(cached_assignments), count
+        
             # Simulate the whole chunk using the current state (raw values)
             start_layer, end_layer = self._get_chunk_range(chunk_idx, num_groups)
+            # print(f"start layer and end layer is {start_layer}, {end_layer}")
             curr_state = (state_bw, state_ctime, start_layer, original_prev_assignment)
             actions_in_chunk = []
 
             for l in range(start_layer, end_layer + 1):
                 action_2d = self._get_policy_action(curr_state)
+                # print(f"action for layer {l} is {action_2d}")
                 hashable = self._action_to_hashable(action_2d)
                 actions_in_chunk.append((action_2d, hashable))
                 curr_state = (state_bw, state_ctime, l + 1, action_2d)
@@ -162,7 +169,12 @@ class TabularActorCriticAgent:
                 chosen_action = self._get_default_action(layer)
 
             self.group_range_assignments[cache_key] = chosen_action
-            return chosen_action, count
+            assignment_vector = chosen_action[0][1]
+            actions = []
+            current_layer = state[2]
+            for _ in range(self.profiling.get_num_nodes(current_layer)):
+                actions.append([state[2], (1 if assignment_vector > 0 else 0)])
+            return np.array(actions), count
 
         # ========== NON‑GROUPED CASE (original) ==========
         actions = self._get_possible_actions(layer)
@@ -219,6 +231,7 @@ class TabularActorCriticAgent:
     def step(self, current_state, num_groups=None, count=0):
         start_time = time.time()
         action, cached_count = self.choose_action(current_state, num_groups=num_groups, count=count)
+        # print(f"action for label {current_state[2]} is {action}")
         overhead_time_per_step = time.time() - start_time
 
         layer = int(current_state[2])

@@ -16,6 +16,7 @@ class ProfilingData:
         deadline,
         edge_communication_power,
         dependencies,
+        number_of_op_tokens,
     ):
         self.numberOfEdgeDevice = numberOfEdgeDevice
         self.layers = layers
@@ -29,12 +30,17 @@ class ProfilingData:
         self.deadline = deadline
         self.edge_communication_power = edge_communication_power
         self.dependencies = dependencies
+        self.numberOfOpTokens = number_of_op_tokens
 
     def get_num_nodes(self, layer_idx):
         return len(self.layers[layer_idx])
 
     def get_node_edge_time(self, layer_idx, node_idx):
         return self.node_edge_times.get((layer_idx, node_idx), 0.0)
+    
+    def get_number_of_op_tokens(self, layer_idx, node_idx):
+        return self.numberOfOpTokens.get((layer_idx, node_idx), 0.0)
+
 
     def get_node_cloud_time(self, layer_idx, node_idx):
         return self.node_cloud_times.get((layer_idx, node_idx), 0.0)
