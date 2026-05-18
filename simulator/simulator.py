@@ -5,8 +5,9 @@ import random
 from bisect import bisect_left
 from typing import List, Tuple, Optional
 from profiling.profiling_class import ProfilingData
+from simulator.simulate_eos import EosSimulator
 
-contention_csv_path = os.path.join("simulator", "contention.csv")
+contention_csv_path = os.path.join("simulator", "data", "contention.csv")
 df_contention = pd.read_csv(contention_csv_path)
 
 # ==================== BANDWIDTH TRACKER ====================
@@ -127,12 +128,14 @@ class CloudEdgeSimulator:
         self.isEos2 = False
         self.total_generated_tokens = 0
 
+        self.eos_simulator = EosSimulator(graph_index='graph3')
+
         self.total_pipeline = total_pipeline
         # Default bandwidth CSV path
 
 
-        self.contention_csv_path = os.path.join("simulator", "contention.csv")
-        bandwidth_csv_path = os.path.join("simulator", "bw_data.csv")
+        self.contention_csv_path = os.path.join("simulator", 'data',"contention.csv")
+        bandwidth_csv_path = os.path.join("simulator", "data","bw_data.csv")
 
         if bandwidth_csv_path:
             try:
@@ -295,62 +298,7 @@ class CloudEdgeSimulator:
        
         # Get current bandwidth
         current_bandwidth = self.get_current_bandwidth()
-        
-        # Check if this was the last layer
-
-        if layer + 1 < len(self.profiling.layers):
-            terminal = False
-            if 70 < layer < 97:
-                if np.random.rand() < 0.075:
-                    self.isEos2 = True
-                if  np.random.rand() < 0.075:       
-                    self.isEos1 = True  
-
-                if (self.isEos1 and  self.isEos2):
-                    next_layer = 100
-                    self.isEos1 = False 
-                    self.isEos2 = False
-                else:
-                    next_layer = layer + 1
-            elif 98 < layer < 129 :
-                self.isEos1 =False
-                self.isEos2 =False  
-                next_layer = layer + 1
-            elif 130 < layer < 150:
-                if np.random.rand() < 0.075:
-                    self.isEos1 = True
-                if np.random.rand() <0.075:    
-                    self.isEos2 = True
-                if (self.isEos1 and  self.isEos2):
-                    next_layer = 150
-                    self.isEos1 = False 
-                    self.isEos2 = False
-                else:
-                    next_layer = layer + 1
-            elif 150< layer < 219: 
-                self.isEos1 =False
-                self.isEos2 =False  
-                next_layer = layer + 1
-            elif 220 < layer < 250:
-                if np.random.rand() < 0.075:
-                    next_layer = 250
-                    terminal = True
-                else:
-                  next_layer = layer + 1
- 
-            else:
-                next_layer = layer + 1
-                terminal = False
-        else:
-            next_layer = layer
-            terminal = True
-
-        
-        # if (self.isEos1):
-        #     self.isEos1, self.isEos2 = False, False
-        #     if (layer < 100):
-        #         next_layer = 100
-
+        self.isEos1, self.isEos2, next_layer, terminal = self.eos_simulator.simulate_eos(layer, len(self.profiling.layers))
         for i in range(len(action)):
             number_of_op_tokens = self.profiling.get_number_of_op_tokens(layer, i)
             if (not self.isEos1 or not self.isEos2 or (i == 0 and layer == 0)):
