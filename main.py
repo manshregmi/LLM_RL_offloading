@@ -5,9 +5,7 @@ Main execution script for Pure Latency Minimization with Actor-Critic and Baseli
 import numpy as np
 import pandas as pd
 import os
-from profiling.cascade_profiling_data import cascade_profiling
-from profiling.initialize_agx_profiling import get_LLM_profiling_data
-from profiling.initialize_graph3 import get_graph3
+from profiling.initialize.initialize_graph3 import get_graph3
 from runner.run_a2c import aggregate_assignments_by_segment, evaluate_agent, plot_assignment_percentages, train_a2c_agent
 from baselines.hurustic_baselines import run_scheduler 
 import matplotlib.pyplot  as plt

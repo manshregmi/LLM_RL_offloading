@@ -1684,6 +1684,20 @@ def get_graph3():
     }
 
 
+    number_of_op_tokens = {}
+
+    for l in range(len(layer)):
+        for node in layer[l]:
+            key = (l, node)
+            number_of_op_tokens[key] = number_of_op_tokens.get(key, 0) + 1
+
+    # Replace (or set) the value for key (0,0) to 100
+    number_of_op_tokens[(0, 0)] = 100
+
+    print("Number of op tokens for each node:", number_of_op_tokens)
+
+
+
 
 
     profiling_data = ProfilingData(
@@ -1699,6 +1713,7 @@ def get_graph3():
             deadline=1,
             edge_communication_power=5.94,
             dependencies=dependencies,
+            number_of_op_tokens=number_of_op_tokens
         )
     return profiling_data
 
