@@ -5,6 +5,8 @@ Main execution script for Pure Latency Minimization with Actor-Critic and Baseli
 import numpy as np
 import pandas as pd
 import os
+from profiling.initialize.initialize_agx_profiling import get_LLM_profiling_data
+from profiling.initialize.initialize_graph2 import get_graph2
 from profiling.initialize.initialize_graph3 import get_graph3
 from runner.run_a2c import aggregate_assignments_by_segment, evaluate_agent, plot_assignment_percentages, train_a2c_agent
 from baselines.hurustic_baselines import run_scheduler 
@@ -174,7 +176,7 @@ if __name__ == "__main__":
         # print("=" * 80)
         
         # Define number of episodes for training and baselines
-        TRAIN_EPISODES = 100
+        TRAIN_EPISODES = 1000
         BASELINE_EPISODES = 1
         
         # # Run baseline schedulers
@@ -208,7 +210,7 @@ if __name__ == "__main__":
     # )
     # latencies_ms, rewards, assignment_counts = evaluate_agent(agent, num_episodes=1000)
 
-    plot_convergence_curve(episode_rewards)
+    # plot_convergence_curve(episode_rewards)
 
     # segments = aggregate_assignments_by_segment(assignment_counts)
 
