@@ -74,6 +74,7 @@ def run_scheduler(profiling_data: ProfilingData, episodes=10, max_steps=5000, sc
     initial_bandwidth = simulator.get_current_bandwidth()
     initial_cloud_contention = 0.0  # No pending cloud work initially
     initial_layer = 0
+    episode_num_of_tokens = []
 
     for ep in range(episodes):
         # Reset for new episode
@@ -143,6 +144,9 @@ def run_scheduler(profiling_data: ProfilingData, episodes=10, max_steps=5000, sc
                 break
         
         # Convert latency to ms for reporting
+        total_ep_tokens = simulator.get_total_generated_tokens(terminal=terminal)
+        episode_num_of_tokens.append(total_ep_tokens)
+
         total_latency_ms = total_latency_s * 1000
         
         episode_latencies.append(total_latency_ms)
@@ -163,6 +167,13 @@ def run_scheduler(profiling_data: ProfilingData, episodes=10, max_steps=5000, sc
     print(f"Average Reward: {avg_reward:.2f}")
     print(f"Total Episodes: {episodes}")
     print(f"{'='*50}")
+
+
+    print("\n" + "=" * 80)
+    print("Average time per token:")
+    print(f"Average time per token: {np.mean(episode_latencies[1000:])/np.mean(episode_num_of_tokens[1000:]):.4f}ms")
+    print(f" minimum time per token: {np.min(episode_latencies[1000:])/np.max(episode_num_of_tokens[1000:]):.4f}ms")
+    print(f" maximum time per token: {np.max(episode_latencies[1000:])/np.min(episode_num_of_tokens[1000:]):.4f}ms")
     
     # Optional: Plot results
     # plt.figure(figsize=(12, 4))

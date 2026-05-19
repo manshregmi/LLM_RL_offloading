@@ -1,4 +1,5 @@
 import numpy as np
+from profiling.initialize.initialize_agx_profiling import get_LLM_profiling_data
 from profiling.profiling_class import ProfilingData
 from simulator.simulator import CloudEdgeSimulator
 
@@ -72,6 +73,7 @@ def run_edgeshard_scheduler(profiling_data: ProfilingData, episodes=10, max_step
     episode_latencies = []
     episode_rewards = []
     all_action_plans = []   # store the list of action matrices for each episode
+    episode_number_of_tokens = []
 
     simulator = CloudEdgeSimulator(profiling_data)
 
@@ -138,6 +140,8 @@ def run_edgeshard_scheduler(profiling_data: ProfilingData, episodes=10, max_step
                 break
 
         total_latency_ms = total_latency_s * 1000
+        total_ep_tokens = simulator.get_total_generated_tokens(terminal=terminal)
+        episode_number_of_tokens.append(total_ep_tokens)
         episode_latencies.append(total_latency_ms)
         episode_rewards.append(total_reward)
 
@@ -154,14 +158,20 @@ def run_edgeshard_scheduler(profiling_data: ProfilingData, episodes=10, max_step
     print(f"Total Episodes: {episodes}")
     print(f"{'='*50}")
 
+    print("\n" + "=" * 80)
+    print("Average time per token:")
+    print(f"Average time per token: {np.mean(episode_latencies[1000:])/np.mean(episode_number_of_tokens[1000:]):.4f}ms")
+    print(f" minimum time per token: {np.min(episode_latencies[1000:])/np.max(episode_number_of_tokens[1000:]):.4f}ms")
+    print(f" maximum time per token: {np.max(episode_latencies[1000:])/np.min(episode_number_of_tokens[1000:]):.4f}ms")
+
     # Return the actions for the first episode as an example of the format
     # (or return all_action_plans if needed)
     return avg_latency_ms, avg_reward, all_action_plans[0]
 
 # Example usage
 if __name__ == "__main__":
-    from profiling.initialize_agx_profiling import get_LLM_profiling_data
 
     profiling_data = get_LLM_profiling_data()
     avg_lat, avg_rew, actions = run_edgeshard_scheduler(profiling_data, episodes=1000)
+
     print("latency is", avg_lat)
