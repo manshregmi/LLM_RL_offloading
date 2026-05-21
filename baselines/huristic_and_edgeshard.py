@@ -2,6 +2,7 @@ import time
 
 import numpy as np
 from profiling.initialize.initialize_agx_profiling import get_LLM_profiling_data
+from profiling.initialize.initialize_graph3 import get_graph3
 from profiling.profiling_class import ProfilingData
 from simulator.simulator import CloudEdgeSimulator
 
@@ -186,7 +187,7 @@ def run_edgeshard_scheduler(profiling_data: ProfilingData, episodes=10, max_step
 # Example usage
 if __name__ == "__main__":
 
-    profiling_data = get_LLM_profiling_data()
+    profiling_data = get_graph3()
     avg_lat, avg_rew, actions = run_edgeshard_scheduler(profiling_data, episodes=1000)
 
     print("latency is", avg_lat)
