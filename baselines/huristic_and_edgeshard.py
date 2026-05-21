@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 from profiling.initialize.initialize_agx_profiling import get_LLM_profiling_data
 from profiling.profiling_class import ProfilingData
@@ -74,6 +76,8 @@ def run_edgeshard_scheduler(profiling_data: ProfilingData, episodes=10, max_step
     episode_rewards = []
     all_action_plans = []   # store the list of action matrices for each episode
     episode_number_of_tokens = []
+    episode_overhead_time = []
+    average_step_overhead_times = []
 
     simulator = CloudEdgeSimulator(profiling_data)
 
@@ -83,13 +87,17 @@ def run_edgeshard_scheduler(profiling_data: ProfilingData, episodes=10, max_step
         initial_cloud_contention = 0.0
         initial_layer = 0
         initial_prev_action = None
+        # step_overhead_times = []
 
+
+        start_time = time.time()
         # ---- EdgeShard: compute static device assignment ----
         devices = edgeshard_dp(profiling_data, simulator,
                                bandwidth_mbps=initial_bandwidth,
                                cloud_pending=initial_cloud_contention)
         # Build action matrices for all layers
         actions_list = []
+       
         num_layers = len(profiling_data.layers)
         for layer_idx in range(num_layers):
             num_nodes = profiling_data.get_num_nodes(layer_idx)
@@ -99,11 +107,13 @@ def run_edgeshard_scheduler(profiling_data: ProfilingData, episodes=10, max_step
             actions_list.append(action_mat)
         all_action_plans.append(actions_list)
         # ------------------------------------------------
-
+        end_time = time.time()
+        overhead_time = end_time - start_time 
         state = (initial_bandwidth, initial_cloud_contention, initial_layer, initial_prev_action)
         total_latency_s = 0.0
         total_reward = 0.0
         step_count = 0
+        
 
         for step in range(max_steps):
             current_layer = state[2]
@@ -124,7 +134,7 @@ def run_edgeshard_scheduler(profiling_data: ProfilingData, episodes=10, max_step
 
             latency_s = simulator.compute_latency(state, action, next_cloud_pending)
             reward = simulator.calculate_latency_reward(latency_s, scale_factor=10.0)
-
+            
             next_state, terminal = simulator.get_next_state(
                 current_state=state,
                 action=action,
@@ -144,6 +154,8 @@ def run_edgeshard_scheduler(profiling_data: ProfilingData, episodes=10, max_step
         episode_number_of_tokens.append(total_ep_tokens)
         episode_latencies.append(total_latency_ms)
         episode_rewards.append(total_reward)
+        episode_overhead_time.append(overhead_time)
+        average_step_overhead_times.append(np.mean(overhead_time)/num_layers)
 
         print(f"Episode {ep+1}/{episodes}: Latency={total_latency_ms:.2f}ms, "
               f"Reward={total_reward:.2f}, Steps={step_count}")
@@ -159,12 +171,18 @@ def run_edgeshard_scheduler(profiling_data: ProfilingData, episodes=10, max_step
     print(f"{'='*50}")
 
     print("\n" + "=" * 80)
+    print("Overhead statistics:")
+    print(f"Mean overhead per episode: {np.mean(episode_overhead_time)*1000:.4f} ms")
+    print(f"Std overhead per episode: {np.std(episode_overhead_time)*1000:.4f} ms")
+    print(f"Mean overhead per step: {np.mean(average_step_overhead_times)*1000:.4f} ms")
+    print("=" * 80)
+
+    print("\n" + "=" * 80)
     print("Average time per token:")
     print(f"Average time per token: {np.mean(episode_latencies[1000:])/np.mean(episode_number_of_tokens[1000:]):.4f}ms")
     print(f" minimum time per token: {np.min(episode_latencies[1000:])/np.max(episode_number_of_tokens[1000:]):.4f}ms")
     print(f" maximum time per token: {np.max(episode_latencies[1000:])/np.min(episode_number_of_tokens[1000:]):.4f}ms")
-
-    # Return the actions for the first episode as an example of the format
+     # Return the actions for the first episode as an example of the format
     # (or return all_action_plans if needed)
     return avg_latency_ms, avg_reward, all_action_plans[0]
 
