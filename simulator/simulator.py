@@ -135,7 +135,7 @@ class CloudEdgeSimulator:
 
 
         self.contention_csv_path = os.path.join("simulator", 'data',"contention.csv")
-        bandwidth_csv_path = os.path.join("simulator", "data","bw_data.csv")
+        bandwidth_csv_path = os.path.join("simulator", "data","bw_data_private.csv")
 
         if bandwidth_csv_path:
             try:
