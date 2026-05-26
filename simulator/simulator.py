@@ -128,7 +128,7 @@ class CloudEdgeSimulator:
         self.isEos2 = False
         self.total_generated_tokens = 0
 
-        self.eos_simulator = EosSimulator(graph_index='graph3')
+        self.eos_simulator = EosSimulator(graph_index='graph2')
 
         self.total_pipeline = total_pipeline
         # Default bandwidth CSV path
@@ -298,12 +298,17 @@ class CloudEdgeSimulator:
        
         # Get current bandwidth
         current_bandwidth = self.get_current_bandwidth()
-        self.isEos1, self.isEos2, next_layer, terminal = self.eos_simulator.simulate_eos(layer, len(self.profiling.layers))
-        for i in range(len(action)):
-            number_of_op_tokens = self.profiling.get_number_of_op_tokens(layer, i)
-            if (not self.isEos1 or not self.isEos2 or (i == 0 and layer == 0)):
-                self.total_generated_tokens += number_of_op_tokens                
-        
+        # self.isEos1, self.isEos2, next_layer, terminal = self.eos_simulator.simulate_eos(layer, len(self.profiling.layers))
+        # for i in range(len(action)):
+        #     number_of_op_tokens = self.profiling.get_number_of_op_tokens(layer, i)
+        #     if (not self.isEos1 or not self.isEos2 or (i == 0 and layer == 0)):
+        #         self.total_generated_tokens += number_of_op_tokens                
+        if (layer < (len(self.profiling.layers)-1)):
+            next_layer = layer+1
+            terminal = False
+        else:
+            next_layer = layer
+            terminal = True
         # Convert previous action to pattern for next state
         prev_action_pattern = self._action_to_pattern(action)
        

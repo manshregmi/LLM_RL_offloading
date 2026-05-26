@@ -115,6 +115,46 @@ def compare_with_a2c(a2c_latency, a2c_reward, baseline_results):
 def moving_average(data, window):
     """Compute moving average with given window size."""
     return np.convolve(data, np.ones(window)/window, mode='valid')
+def detect_convergence(smoothed, window_offset=0, tol=0.02, stable_window=500):
+    """
+    Detect the episode at which a smoothed curve converges to a stable value.
+    
+    Args:
+        smoothed: array of smoothed values (e.g., output of moving_average)
+        window_offset: offset to add to indices (e.g., window-1 if smoothed 
+                       starts at episode window-1 rather than 0)
+        tol: relative tolerance for stability (e.g., 0.02 = 2% of final value)
+        stable_window: number of consecutive points that must stay within tolerance
+    
+    Returns:
+        (convergence_episode, converged_value, final_value) or (None, None, final_value)
+        if no convergence is detected.
+    """
+    smoothed = np.asarray(smoothed)
+    
+    if len(smoothed) < stable_window:
+        print("Not enough data to detect convergence.")
+        return None, None, None
+    
+    # The value the curve settles to (mean of the tail)
+    final_value = np.mean(smoothed[-stable_window:])
+    threshold = tol * abs(final_value)
+    
+    # Walk forward and find the first window that stays within tolerance
+    for i in range(len(smoothed) - stable_window):
+        segment = smoothed[i:i + stable_window]
+        if np.max(np.abs(segment - final_value)) < threshold:
+            convergence_episode = i + window_offset
+            converged_value = smoothed[i]
+            print(f"✓ Convergence detected at episode ~{convergence_episode}")
+            print(f"  Converged value at that point: {converged_value:.2f}")
+            print(f"  Final stable value:            {final_value:.2f}")
+            print(f"  Tolerance used:                ±{threshold:.2f} ({tol*100:.1f}%)")
+            return convergence_episode, converged_value, final_value
+    
+    print(f"✗ No convergence detected (tol={tol}, stable_window={stable_window})")
+    print(f"  Final value: {final_value:.2f}")
+    return None, None, final_value
 
 def plot_convergence_curve(episode_rewards, window=200, title="", 
                            xlabel="Episode", ylabel="Reward", save_path="/Users/ayushmarasini/Downloads/LLM/LLM_RL_offloading/"):
@@ -135,6 +175,10 @@ def plot_convergence_curve(episode_rewards, window=200, title="",
     
     # Plot smoothed values
     smoothed = moving_average(episode_rewards, window)
+    conv_episode, conv_value, final_value = detect_convergence(
+        smoothed, window_offset=window-1, tol=0.02, stable_window=300
+    )
+    
     smoothed_episodes = np.arange(window-1, len(episode_rewards))
     plt.plot(smoothed_episodes, smoothed, linewidth=2, color='blue', label=f'Moving avg (window={window})')
     
@@ -154,7 +198,7 @@ if __name__ == "__main__":
     print("LOADING PROFILING DATA")
     print("=" * 80)
     # profiling_data = get_LLM_profiling_data()
-    profiling_data = get_graph3()
+    profiling_data = get_graph2()
     pipleline_overhead_time = []
 
     for n in range(1,2,2):
@@ -176,7 +220,7 @@ if __name__ == "__main__":
         # print("=" * 80)
         
         # Define number of episodes for training and baselines
-        TRAIN_EPISODES = 50000
+        TRAIN_EPISODES = 10000
         BASELINE_EPISODES = 1
         
         # # Run baseline schedulers
@@ -210,7 +254,7 @@ if __name__ == "__main__":
     # )
     # latencies_ms, rewards, assignment_counts = evaluate_agent(agent, num_episodes=1000)
 
-    # plot_convergence_curve(episode_rewards)
+    plot_convergence_curve(episode_rewards)
 
     # segments = aggregate_assignments_by_segment(assignment_counts)
 
