@@ -128,7 +128,7 @@ class CloudEdgeSimulator:
         self.isEos2 = False
         self.total_generated_tokens = 0
 
-        self.eos_simulator = EosSimulator(graph_index='graph3')
+        self.eos_simulator = EosSimulator(graph_index=self.profiling.graph_index)
 
         self.total_pipeline = total_pipeline
         # Default bandwidth CSV path

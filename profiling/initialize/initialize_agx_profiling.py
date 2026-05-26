@@ -2053,7 +2053,8 @@ def get_LLM_profiling_data():
         deadline=1,
         edge_communication_power=5.94,
         dependencies=dependencies,
-        number_of_op_tokens=number_of_op_tokens
+        number_of_op_tokens=number_of_op_tokens,
+        graph_index='graph1',
 
     )
     return profiling_data

@@ -1713,7 +1713,9 @@ def get_graph3():
             deadline=1,
             edge_communication_power=5.94,
             dependencies=dependencies,
-            number_of_op_tokens=number_of_op_tokens
+            number_of_op_tokens=number_of_op_tokens,
+            graph_index='graph3',
+
         )
     return profiling_data
 

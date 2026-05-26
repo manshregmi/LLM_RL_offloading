@@ -1,1 +1,7 @@
 *.pkl
+# Python cache
+__pycache__/
+*.py[cod]
+
+*.csv
+*.png

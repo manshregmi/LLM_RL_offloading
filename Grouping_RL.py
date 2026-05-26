@@ -20,6 +20,8 @@ Design:
 """
 
 import asyncio
+import os
+import pandas as pd
 import numpy as np
 B = 3 
 L = 400 
@@ -61,13 +63,18 @@ ALPHA_VALUE = 0.1                   # value table learning rate (higher: critic
 # --- State discretization ---
 # 10 bins per dimension -> 100 states. Coarse enough for fast convergence,
 # fine enough to capture meaningful (bw, contention) variation.
-NUM_BW_BINS = 9
-NUM_CONT_BINS = 19
-NUM_STATES = NUM_BW_BINS * NUM_CONT_BINS
 
 # Bin edges — adjust these to match your simulator's real BW/contention ranges.
-BW_BIN_EDGES = np.linspace(1, 15.0, NUM_BW_BINS + 1)      # Mbps
-CONT_BIN_EDGES = np.linspace(0, 20.0, NUM_CONT_BINS + 1)  # ms
+bw_path = os.path.join("simulator", "data", "bw_data.csv")
+df = pd.read_csv(bw_path)
+bw_mbps = df["bandwidth_mbps"]
+
+bw_min_floor = np.floor(np.min(bw_mbps)/8)
+bw_max_ceil = np.ceil(np.max(bw_mbps)/8)
+
+
+BW_BIN_EDGES = np.linspace(bw_min_floor, bw_max_ceil, 15)      # Mbps
+CONT_BIN_EDGES = np.linspace(0, 45, 20)  # ms
 
 # --- Exploration ---
 # Entropy-style exploration: softmax temperature over policy logits.
@@ -95,8 +102,8 @@ class GroupingRL:
     """
 
     def __init__(self,
-                 num_bw_bins=NUM_BW_BINS,
-                 num_cont_bins=NUM_CONT_BINS,
+                 num_bw_bins=15,
+                 num_cont_bins=20,
                  B: int = B, 
                  L: int = L, 
                  phi: int = PHI, 

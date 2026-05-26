@@ -6,6 +6,7 @@ import os
 from profiling.profiling_class import ProfilingData
 from simulator.simulator import CloudEdgeSimulator
 from collections import Counter
+import pandas as pd
 
 
 class TabularActorCriticAgent:
@@ -33,9 +34,15 @@ class TabularActorCriticAgent:
         self.policy_table = {}
         self.value_table = {}
         self.simulator = CloudEdgeSimulator(profiling_data, total_pipeline=total_pipelines)
+        bw_path = os.path.join("simulator", "data", "bw_data.csv")
+        df = pd.read_csv(bw_path)
+        bw_mbps = df["bandwidth_mbps"]
 
-        self.bandwidth_bins = np.linspace(1, 15, 15)
-        self.cloudtime_bins = np.linspace(0, 100, 20)
+        bw_min_floor = np.floor(np.min(bw_mbps)/8)
+        bw_max_ceil = np.ceil(np.max(bw_mbps)/8)
+        self.bandwidth_bins = np.linspace(bw_min_floor, bw_max_ceil, 15)
+
+        self.cloudtime_bins = np.linspace(0, 45, 20)
 
         self.temperature = 1.0
         self.temperature_min = 0.01
