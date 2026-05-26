@@ -9,6 +9,7 @@ from profiling.initialize.initialize_agx_profiling import get_LLM_profiling_data
 from profiling.initialize.initialize_graph3 import get_graph3
 from runner.run_a2c import aggregate_assignments_by_segment, evaluate_agent, plot_assignment_percentages, train_a2c_agent
 from baselines.hurustic_baselines import run_scheduler 
+from models.coarse_grained_a2c import OneShotTabularA2C
 import matplotlib.pyplot  as plt
 
 from runner.run_dq import train_double_q_agent
@@ -189,15 +190,37 @@ if __name__ == "__main__":
         print("TRAINING A2C AGENT")
         print("=" * 80)
 
-        agent, episode_latencies, episode_rewards, overhead_time = train_a2c_agent(
-            # profiling_data=cascaded_profiling_data,
-            profiling_data = profiling_data,
-            episodes=TRAIN_EPISODES,
-            is_test=True,           # Training mode
-            verbose=False,            # Print progress
-            total_pipelines=n
-        )
-        pipleline_overhead_time.append(overhead_time)
+        # agent, episode_latencies, episode_rewards, overhead_time = train_a2c_agent(
+        #     # profiling_data=cascaded_profiling_data,
+        #     profiling_data = profiling_data,
+        #     episodes=TRAIN_EPISODES,
+        #     is_test=True,           # Training mode
+        #     verbose=False,            # Print progress
+        #     total_pipelines=n
+        # )
+        # pipleline_overhead_time.append(overhead_time)
+
+        coarse_grained_latencies = []
+        agent = OneShotTabularA2C(profiling_data, alpha_actor=0.02, alpha_critic=0.05)
+        agent.load()
+        episode_overhead_times = []
+        episode_token_generation = []
+        for episode in range(TRAIN_EPISODES):
+            agent.start_episode()
+            total_latency_ms, total_reward, overhead_time, ep_generated_token = agent.run_episode()
+            episode_token_generation.append(ep_generated_token)
+            coarse_grained_latencies.append(total_latency_ms)
+            episode_overhead_times.append(overhead_time)
+        agent.save()
+        print("coarse grained latencies:", np.mean(coarse_grained_latencies), np.std(coarse_grained_latencies), np.min(coarse_grained_latencies), np.max(coarse_grained_latencies))
+        print("episode overhead times:", np.mean(episode_overhead_times[500:]), np.std(episode_overhead_times[500:]), np.min(episode_overhead_times), np.max(episode_overhead_times))
+        print("\n" + "=" * 80)
+        print("Average time per token:")
+        print(f"Average time per token: {np.mean(coarse_grained_latencies)/np.mean(episode_token_generation):.4f}ms")
+        print(f" minimum time per token: {np.min(coarse_grained_latencies)/np.max(episode_token_generation):.4f}ms")
+        print(f" maximum time per token: {np.max(coarse_grained_latencies)/np.min(episode_token_generation):.4f}ms")
+
+
         # print(f"Pipeline overhead time for {n} pipelines: {overhead_time:.2f} ms")
     # pd.DataFrame(pipleline_overhead_time).to_csv('pipeline_overhead.csv', index=False, header=False)
 
