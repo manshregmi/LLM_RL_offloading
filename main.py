@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import os
 from profiling.initialize.initialize_agx_profiling import get_LLM_profiling_data
+from profiling.initialize.initialize_graph2 import get_graph2
 from profiling.initialize.initialize_graph3 import get_graph3
 from runner.run_a2c import aggregate_assignments_by_segment, evaluate_agent, plot_assignment_percentages, train_a2c_agent
 from baselines.hurustic_baselines import run_scheduler 
@@ -115,6 +116,25 @@ def moving_average(data, window):
     """Compute moving average with given window size."""
     return np.convolve(data, np.ones(window)/window, mode='valid')
 
+
+def find_convergence_improved(smoothed, run_length=5):
+    # Find indices where the sequence is non-increasing (converging down)
+    converging = [i for i in range(len(smoothed)-1) if (smoothed[i]//10) >= (smoothed[i+1]//10)]
+    
+    # Look for 'run_length' consecutive indices in 'converging'
+    count = 1
+    for i in range(1, len(converging)):
+        if converging[i] == converging[i-1] + 1:
+            count += 1
+            if count >= run_length:
+                return converging[i-run_length+1]   # start index of the run
+        else:
+            count = 1
+    # Fallback: return where the longest run starts (even if short)
+    # (you would compute longest run first)
+    return -1   # no convergence detected
+
+
 def plot_convergence_curve(episode_rewards, window=200, title="", 
                            xlabel="Episode", ylabel="Reward", save_path="/Users/ayushmarasini/Downloads/LLM/LLM_RL_offloading/"):
     """
@@ -134,6 +154,11 @@ def plot_convergence_curve(episode_rewards, window=200, title="",
     
     # Plot smoothed values
     smoothed = moving_average(episode_rewards, window)
+    conv_episode = find_convergence_improved(smoothed, run_length=800)
+    if (conv_episode > 0):
+        print(f"converged at episode {conv_episode}")
+    else:
+        print(f"did not converged")
     smoothed_episodes = np.arange(window-1, len(episode_rewards))
     plt.plot(smoothed_episodes, smoothed, linewidth=2, color='blue', label=f'Moving avg (window={window})')
     
@@ -152,8 +177,8 @@ if __name__ == "__main__":
     print("=" * 80)
     print("LOADING PROFILING DATA")
     print("=" * 80)
-    # profiling_data = get_LLM_profiling_data()
-    profiling_data = get_graph3()
+    profiling_data = get_LLM_profiling_data()
+    # profiling_data = get_graph3()
     pipleline_overhead_time = []
 
     for n in range(1,2,2):
@@ -175,7 +200,7 @@ if __name__ == "__main__":
         # print("=" * 80)
         
         # Define number of episodes for training and baselines
-        TRAIN_EPISODES = 100
+        TRAIN_EPISODES = 10000
         BASELINE_EPISODES = 1
         
         # # Run baseline schedulers
@@ -188,7 +213,11 @@ if __name__ == "__main__":
         print("\n" + "=" * 80)
         print("TRAINING A2C AGENT")
         print("=" * 80)
-
+        try:
+            os.remove("a2c_tables.pkl")
+            os.remove("grouping_rl_tables.pkl")
+        except FileNotFoundError:
+            print("error deleting")
         agent, episode_latencies, episode_rewards, overhead_time = train_a2c_agent(
             # profiling_data=cascaded_profiling_data,
             profiling_data = profiling_data,
@@ -209,7 +238,7 @@ if __name__ == "__main__":
     # )
     # latencies_ms, rewards, assignment_counts = evaluate_agent(agent, num_episodes=1000)
 
-    # plot_convergence_curve(episode_rewards)
+    plot_convergence_curve(episode_rewards)
 
     # segments = aggregate_assignments_by_segment(assignment_counts)
 

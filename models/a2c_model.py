@@ -154,7 +154,7 @@ class TabularActorCriticAgent:
             curr_state = (state_bw, state_ctime, start_layer, original_prev_assignment)
             actions_in_chunk = []
 
-            for l in range(start_layer, end_layer + 1):
+            for l in range(start_layer, start_layer + 1):
                 action_2d = self._get_policy_action(curr_state)
                 # print(f"action for layer {l} is {action_2d}")
                 hashable = self._action_to_hashable(action_2d)
