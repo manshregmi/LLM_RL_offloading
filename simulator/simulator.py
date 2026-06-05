@@ -350,6 +350,7 @@ class CloudEdgeSimulator:
             float: Latency in seconds
         """
         bandwidth, _, layer, prev_action = current_state
+        bandwidth = self.get_current_bandwidth()
         layer = int(layer)
 
         profiling = self.profiling
