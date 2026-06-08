@@ -124,8 +124,8 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
                         next_state_key=None,
                         done=True
                         )
-                    
-                    if (episode % 100)== 0:
+
+                    if (episode % PRINT_INTERVAL) == 0:
                         grouping_RL_agent.save()  # Save grouping agent state after each episode
 
 
@@ -136,7 +136,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
                         best_episode = episode
                     
                     # Logging
-                    if episode % 100 == 0:
+                    if episode % PRINT_INTERVAL == 0:
                         avg_latency = np.mean(episode_latencies[-PRINT_INTERVAL:])
                         avg_reward = np.mean(episode_rewards[-PRINT_INTERVAL:])
                         avg_td_error = np.mean(td_errors) if td_errors else 0
@@ -150,7 +150,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
                             f"TD: {avg_td_error:6.2f} | "
                             f"Steps: {step_count}")
                 
-                    print("\n" + "=" * 80)
+                print("\n" + "=" * 80)
                 print("Average time per token:")
                 print(f"Average time per token: {np.mean(episode_latencies)/np.mean(episode_generated_tokens):.4f}ms")
                 print(f" minimum time per token: {np.min(episode_latencies)/np.max(episode_generated_tokens):.4f}ms")
