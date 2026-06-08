@@ -40,11 +40,11 @@ class TabularActorCriticAgent:
 
         bw_min_floor = np.floor(np.min(bw_mbps)/8)
         bw_max_ceil = np.ceil(np.max(bw_mbps)/8)
-        self.bandwidth_bins = np.linspace(bw_min_floor, bw_max_ceil, 15)
-
+        # self.bandwidth_bins = np.linspace(bw_min_floor, bw_max_ceil, 15)
         self.cloudtime_bins = np.linspace(0, 45, 20)
+        self.bandwidth_bins = np.linspace(1, 15, 15)
 
-        self.temperature = 1.0
+        self.temperature = 1.5
         self.temperature_min = 0.01
         self.temperature_decay = 0.9995
         self.temperature_boost = 1.5
