@@ -68,7 +68,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
                 state = create_initial_state(agent.simulator)
                 bandwidth = state[0]
                 cloud_contention = state[1]
-                for episode in range(1):
+                for episode in range(10000):
                     rewards_ep = 0
                     state = (bandwidth, cloud_contention, 0, None)
                     # Start episode
