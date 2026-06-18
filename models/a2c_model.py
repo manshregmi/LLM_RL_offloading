@@ -46,7 +46,7 @@ class TabularActorCriticAgent:
 
         self.temperature = 1.5
         self.temperature_min = 0.01
-        self.temperature_decay = 0.9995
+        self.temperature_decay = 0.997999
         self.temperature_boost = 1.5
 
         self.best_episode_latency = float('inf')
@@ -320,7 +320,7 @@ class TabularActorCriticAgent:
             else:
                 grad = -td_error * probs[i]
             new_pref = old + self.alpha_actor * grad
-            self.policy_table[(state_key, akey)] = np.clip(new_pref, -500.0, 500.0)
+            self.policy_table[(state_key, akey)] = np.clip(new_pref, -10000.0, 10000.0)
 
         return td_error
 

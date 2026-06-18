@@ -447,7 +447,7 @@ class CloudEdgeSimulator:
 
     # ================= PURE LATENCY REWARD =================
 
-    def calculate_latency_reward(self, latency_s, scale_factor=100000):
+    def calculate_latency_reward(self, latency_s, scale_factor=1000):
         """
         Calculate reward based purely on latency.
         
