@@ -155,18 +155,24 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
                 print(f"Average time per token: {np.mean(episode_latencies)/np.mean(episode_generated_tokens):.4f}ms")
                 print(f" minimum time per token: {np.min(episode_latencies)/np.max(episode_generated_tokens):.4f}ms")
                 print(f" maximum time per token: {np.max(episode_latencies)/np.min(episode_generated_tokens):.4f}ms")
-                LATENCY_DIRECTORY[(a,c,g)] = np.mean(episode_latencies)/np.mean(episode_generated_tokens)
+                LATENCY_DIRECTORY[f"{a}_{c}_{g}"] = np.mean(episode_latencies)/np.mean(episode_generated_tokens)
+                # LATENCY_DIRECTORY[(a,c,g)] = np.mean(episode_latencies)/np.mean(episode_generated_tokens)
 
     # Save latency data
     with open("latency_data.json", "w") as f:
         json.dump(LATENCY_DIRECTORY, f)
 
+    labels = [str(k) for k in LATENCY_DIRECTORY.keys()]
+    values = list(LATENCY_DIRECTORY.values())
 
+    plt.figure(figsize=(20, 6))
+    plt.plot(range(len(labels)), values, marker='o')
+    plt.xticks(range(len(labels)), labels, rotation=90, fontsize=6)
     plt.title("Average Time per Token for Different Hyperparameters")
     plt.xlabel("Hyperparameter Combination (alpha_actor, alpha_critic, gamma)")
     plt.ylabel("Average Time per Token (ms)")
-    plt.plot(list(LATENCY_DIRECTORY.keys()), list(LATENCY_DIRECTORY.values()), marker='o')
     plt.tight_layout()
+    plt.savefig("latency_plot.png")
     plt.show()
 
 #     # Training parameters
