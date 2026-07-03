@@ -127,6 +127,7 @@ class CloudEdgeSimulator:
         self.isEos1 = False
         self.isEos2 = False
         self.total_generated_tokens = 0
+        self.previous_parent_node_assignment = None
 
         self.eos_simulator = EosSimulator(graph_index=self.profiling.graph_index)
 
@@ -135,7 +136,7 @@ class CloudEdgeSimulator:
 
 
         self.contention_csv_path = os.path.join("simulator", 'data',"contention.csv")
-        bandwidth_csv_path = os.path.join("simulator", "data","bw_data.csv")
+        bandwidth_csv_path = os.path.join("simulator", "data","bw_data_public.csv")
 
         if bandwidth_csv_path:
             try:
@@ -272,8 +273,7 @@ class CloudEdgeSimulator:
                 self.profiling.get_node_cloud_time(layer, i)
                 for i in cloud_nodes
             )
-            new_cloud_pending = cloud_proc_ms * self.profiling.numberOfEdgeDevice
- 
+            new_cloud_pending = cloud_proc_ms * self.profiling.numberOfEdgeDevice 
         return new_cloud_pending
  
     # ================= Next State (Simplified - No Surplus) =================
@@ -350,8 +350,11 @@ class CloudEdgeSimulator:
             float: Latency in seconds
         """
         bandwidth, _, layer, prev_action = current_state
-        bandwidth = self.get_current_bandwidth()
         layer = int(layer)
+
+        for l, _ in self.profiling.dual_dependency_nodes:
+            if l == layer:
+                self.previous_parent_node_assignment = current_action[0][1]
 
         profiling = self.profiling
         deps = profiling.dependencies
@@ -373,11 +376,14 @@ class CloudEdgeSimulator:
                     parent_nodes = deps.get((layer, curr_node), [])
                     for (p_layer, p_node) in parent_nodes:
                         # SAFETY CHECK: Ensure parent is from previous layer and index in bounds
-                        if p_layer == layer - 1 and p_node < prev_layer_nodes:
+                        if p_layer == layer-1:
                             parent_loc = prev_assignments[p_node]
                         else:
-                            # Parent from earlier layer or out of bounds, assume edge
-                            parent_loc = 0
+                            if self.previous_parent_node_assignment is not None:
+                                parent_loc = self.previous_parent_node_assignment
+                            else:
+                                # Parent from earlier layer or out of bounds, assume edge
+                                parent_loc = 0
                             
                         curr_loc = curr_assignments[curr_node]
 
@@ -442,7 +448,7 @@ class CloudEdgeSimulator:
 
         # Update cumulative time
         self.cumulative_time_seconds += completion_time_s
-        # print(f"EOS1 {self.isEos1} and  EOS 2 {self.isEos2} has total time {completion_time_s*1000} for level {current_state[2]} and assignment vector is {current_action}", )
+        # print(f"EOS1 {self.isEos1} and  EOS 2 {self.isEos2} has total time {completion_time_s*1000} for level {current_state[2]} with bandwidth {current_state[0]}  and cloudlet contetion {current_state[1]} and assignment vector is {current_action}", )
         return completion_time_s
 
     # ================= PURE LATENCY REWARD =================

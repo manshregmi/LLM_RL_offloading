@@ -1342,10 +1342,10 @@ def get_graph2():
             (196,0): 12.37890625,
             (197,0): 12.41015625,
             (198,0): 12.44140625,
-            (199,0): (0.03125*200/8),
+            (199,0): 12.45145025,
 
             # bart 200 OP 
-            (200,0): 18.845703125,
+            (200,0): (0.03125*200/8),
             (201,0): 18.892578125,
             (202,0): 18.939453125,
             (203,0): 18.986328125,
@@ -2064,6 +2064,7 @@ def get_graph2():
 
     # Replace (or set) the value for key (0,0) to 100
     number_of_op_tokens[(0, 0)] = 100
+    dual_dependency_nodes =[(0,0)]
 
 
 
@@ -2082,6 +2083,7 @@ def get_graph2():
             dependencies=dependencies,
             number_of_op_tokens=number_of_op_tokens,
             graph_index='graph2',
+            dual_dependency_nodes= dual_dependency_nodes
 
         )
     return profiling_data

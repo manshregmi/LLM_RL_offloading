@@ -1726,8 +1726,8 @@ def get_LLM_profiling_data():
         (97,0): [(96,0)],
         (98,0): [(97,0)],
         (99,0): [(98,0)],
-        (100,0): [(99,0)],
-        (101,0): [(100,0),(0,0)],
+        (100,0): [(99,0),(0,0)],
+        (101,0): [(100,0)],
         (102,0): [(101,0)],
         (103,0): [(102,0)],
         (104,0): [(103,0)],
@@ -2038,6 +2038,7 @@ def get_LLM_profiling_data():
 
     # Replace (or set) the value for key (0,0) to 100
     number_of_op_tokens[(0, 0)] = 100
+    dual_dependency_nodes = [(0,0)]
 
 
     profiling_data = ProfilingData(
@@ -2055,6 +2056,7 @@ def get_LLM_profiling_data():
         dependencies=dependencies,
         number_of_op_tokens=number_of_op_tokens,
         graph_index='graph1',
+        dual_dependency_nodes= dual_dependency_nodes
 
     )
     return profiling_data

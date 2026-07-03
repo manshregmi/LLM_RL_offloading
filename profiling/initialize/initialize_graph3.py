@@ -1693,6 +1693,7 @@ def get_graph3():
 
     # Replace (or set) the value for key (0,0) to 100
     number_of_op_tokens[(0, 0)] = 100
+    dual_dependency_nodes = [(0,0)]
 
     print("Number of op tokens for each node:", number_of_op_tokens)
 
@@ -1715,6 +1716,7 @@ def get_graph3():
             dependencies=dependencies,
             number_of_op_tokens=number_of_op_tokens,
             graph_index='graph3',
+            dual_dependency_nodes= dual_dependency_nodes
 
         )
     return profiling_data
