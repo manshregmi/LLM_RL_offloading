@@ -2064,6 +2064,8 @@ def get_graph2():
 
     # Replace (or set) the value for key (0,0) to 100
     number_of_op_tokens[(0, 0)] = 100
+    dual_dependency_nodes = [(0,0)]
+
 
 
 
@@ -2080,7 +2082,8 @@ def get_graph2():
             deadline=1,
             edge_communication_power=5.94,
             dependencies=dependencies,
-            number_of_op_tokens=number_of_op_tokens
+            number_of_op_tokens=number_of_op_tokens,
+            dual_dependency_nodes = dual_dependency_nodes
         )
     return profiling_data
 

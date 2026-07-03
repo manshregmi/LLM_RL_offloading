@@ -2040,6 +2040,10 @@ def get_LLM_profiling_data():
     number_of_op_tokens[(0, 0)] = 100
 
 
+    dual_dependency_nodes = [(0,0)]
+    
+
+
     profiling_data = ProfilingData(
         numberOfEdgeDevice=numberOfEdgeDevice,
         layers=layers,
@@ -2053,7 +2057,8 @@ def get_LLM_profiling_data():
         deadline=1,
         edge_communication_power=5.94,
         dependencies=dependencies,
-        number_of_op_tokens=number_of_op_tokens
+        number_of_op_tokens=number_of_op_tokens,
+        dual_dependency_nodes = dual_dependency_nodes
 
     )
     return profiling_data
