@@ -8,7 +8,7 @@ import os
 from profiling.initialize.initialize_agx_profiling import get_LLM_profiling_data
 from profiling.initialize.initialize_graph2 import get_graph2
 from profiling.initialize.initialize_graph3 import get_graph3
-from runner.run_a2c import aggregate_assignments_by_segment, evaluate_agent, plot_assignment_percentages, train_a2c_agent
+from runner.run_a2c import train_a2c_agent
 from baselines.hurustic_baselines import run_scheduler 
 import matplotlib.pyplot  as plt
 
@@ -153,8 +153,8 @@ if __name__ == "__main__":
     print("=" * 80)
     print("LOADING PROFILING DATA")
     print("=" * 80)
-    # profiling_data = get_LLM_profiling_data()
-    profiling_data = get_graph3()
+    profiling_data = get_LLM_profiling_data()
+    #profiling_data = get_graph3()
     pipleline_overhead_time = []
 
     for n in range(1,2,2):
@@ -194,7 +194,7 @@ if __name__ == "__main__":
             # profiling_data=cascaded_profiling_data,
             profiling_data = profiling_data,
             episodes=TRAIN_EPISODES,
-            is_test=True,           # Training mode
+            is_test=False,           # Training mode
             verbose=False,            # Print progress
             total_pipelines=n
         )

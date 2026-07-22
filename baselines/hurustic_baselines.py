@@ -2,6 +2,9 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 # from simulator.simulator import CloudEdgeSimulator  # OLD
+# from profiling.initialize.initialize_graph3 import get_graph3
+from profiling.initialize.initialize_agx_profiling import get_LLM_profiling_data
+from profiling.initialize.initialize_graph3 import get_graph3
 from profiling.profiling_class import ProfilingData
 # Import your new simulator
 from simulator.simulator import CloudEdgeSimulator  # Update import path as needed
@@ -45,7 +48,6 @@ def get_all_cloud_action(profiling_data: ProfilingData, layer_idx: int):
     else:
         a[:, 1] = 1  # all cloud
     return a
-
 
 def run_scheduler(profiling_data: ProfilingData, episodes=10, max_steps=5000, scheduler_type='random'):
     """
@@ -97,6 +99,16 @@ def run_scheduler(profiling_data: ProfilingData, episodes=10, max_steps=5000, sc
                 action = get_all_edge_action(profiling_data, current_layer)
             elif scheduler_type == 'all_cloud':
                 action = get_all_cloud_action(profiling_data, current_layer)
+            elif scheduler_type =='half_cloud':
+                if (current_layer < (len(profiling_data.layers) //2)):
+                    action = get_all_cloud_action(profiling_data, current_layer)
+                else:
+                    action = get_all_edge_action(profiling_data, current_layer)
+            elif scheduler_type == 'half_edge': 
+                if (current_layer < (len(profiling_data.layers)) //2): 
+                    action = get_all_edge_action(profiling_data,current_layer)
+                else: 
+                    action = get_all_cloud_action(profiling_data,current_layer)
             else:
                 raise ValueError(f"Unknown scheduler_type: {scheduler_type}")
             
@@ -171,9 +183,9 @@ def run_scheduler(profiling_data: ProfilingData, episodes=10, max_steps=5000, sc
 
     print("\n" + "=" * 80)
     print("Average time per token:")
-    print(f"Average time per token: {np.mean(episode_latencies[1000:])/np.mean(episode_num_of_tokens[1000:]):.4f}ms")
-    print(f" minimum time per token: {np.min(episode_latencies[1000:])/np.max(episode_num_of_tokens[1000:]):.4f}ms")
-    print(f" maximum time per token: {np.max(episode_latencies[1000:])/np.min(episode_num_of_tokens[1000:]):.4f}ms")
+    print(f"Average time per token: {np.mean(episode_latencies)/np.mean(episode_num_of_tokens):.4f}ms")
+    print(f" minimum time per token: {np.min(episode_latencies)/np.max(episode_num_of_tokens):.4f}ms")
+    print(f" maximum time per token: {np.max(episode_latencies)/np.min(episode_num_of_tokens):.4f}ms")
     
     # Optional: Plot results
     # plt.figure(figsize=(12, 4))
@@ -225,10 +237,12 @@ def run_random_scheduler(profiling_data: ProfilingData, episodes=10, max_steps=2
 # Example usage
 if __name__ == "__main__":
     # Load profiling data
-    # profiling_data = ProfilingData(...)  # Load your profiling data
-    
+    #profiling_data = ProfilingData(...)  # Load your profiling data
+    profiling_data = get_LLM_profiling_data()
     # Run different schedulers
-    # avg_latency, avg_reward, misses = run_scheduler(profiling_data, episodes=5, scheduler_type='random')
-    # avg_latency, avg_reward, misses = run_scheduler(profiling_data, episodes=5, scheduler_type='all_edge')
-    # avg_latency, avg_reward, misses = run_scheduler(profiling_data, episodes=5, scheduler_type='all_cloud')
+    # avg_latency, avg_reward, misses = run_scheduler(profiling_data, episodes=1000, scheduler_type='random')
+    #avg_latency, avg_reward, misses = run_scheduler(profiling_data, episodes=2000, scheduler_type='all_edge')
+    avg_latency, avg_reward, misses = run_scheduler(profiling_data, episodes=1, scheduler_type='all_cloud')
+    # avg_latency, avg_reward, misses = run_scheduler(profiling_data, episodes=1000, scheduler_type='half_edge')
+    # avg_latency, avg_reward, misses = run_scheduler(profiling_data, episodes=1, scheduler_type='half_cloud')
     pass

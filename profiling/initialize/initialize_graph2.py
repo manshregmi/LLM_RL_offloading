@@ -16,7 +16,7 @@ def get_graph2():
 #     print("Length of layer is:", len(layer)) 
 
 
-    numberOfEdgeDevice = 5
+    numberOfEdgeDevice = 12
         # -------------------------------
         # ⏱️ Edge execution times (ms)
         # -------------------------------
@@ -2065,6 +2065,10 @@ def get_graph2():
     # Replace (or set) the value for key (0,0) to 100
     number_of_op_tokens[(0, 0)] = 100
     dual_dependency_nodes =[(0,0)]
+    model_boundary_layers = [
+        0, #Yolos , two Llamas 
+        200,  #Bart    
+    ]
 
 
 
@@ -2083,7 +2087,8 @@ def get_graph2():
             dependencies=dependencies,
             number_of_op_tokens=number_of_op_tokens,
             graph_index='graph2',
-            dual_dependency_nodes= dual_dependency_nodes
+            dual_dependency_nodes= dual_dependency_nodes,
+            model_boundary_layers= model_boundary_layers
 
         )
     return profiling_data

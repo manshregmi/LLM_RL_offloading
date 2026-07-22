@@ -13,7 +13,7 @@ def get_graph3():
 #     print("Length of layer is:", len(layer)) 
 
 
-    numberOfEdgeDevice = 5
+    numberOfEdgeDevice = 12
 
     node_edge_times = {
         (0,0): 536, #YOLOS
@@ -1695,7 +1695,12 @@ def get_graph3():
     number_of_op_tokens[(0, 0)] = 100
     dual_dependency_nodes = [(0,0)]
 
-    print("Number of op tokens for each node:", number_of_op_tokens)
+    #print("Number of op tokens for each node:", number_of_op_tokens)
+    model_boundary_layers = [
+        0, #Yolos and two Llamas 
+        100, # two barts   
+        150, # final bart     
+    ]
 
 
 
@@ -1716,7 +1721,8 @@ def get_graph3():
             dependencies=dependencies,
             number_of_op_tokens=number_of_op_tokens,
             graph_index='graph3',
-            dual_dependency_nodes= dual_dependency_nodes
+            dual_dependency_nodes= dual_dependency_nodes,
+            model_boundary_layers= model_boundary_layers
 
         )
     return profiling_data

@@ -1,4 +1,4 @@
-n_llama,n_yolos,n_bart,llama32_avg_ms,yolos_avg_ms,bart_avg_ms,Llama contention,Yolos contention,Bart contention 
+n_llama,n_yolos,n_bart,llama32_avg_ms,yolos_avg_ms,bart_avg_ms,Llama contention,Yolos contention,Bart contention
 0,0,1,,,0.9403,0,0,0
 0,0,2,,,0.9337,0,0,0
 0,0,3,,,0.9308,0,0,0

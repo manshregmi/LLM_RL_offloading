@@ -22,14 +22,18 @@ class TabularActorCriticAgent:
         alpha_critic=0.05,
         gamma=0.95,
         reward_scale=10.0,
-        total_pipelines=1
+        total_pipelines=1,
+        average_reward_lr=0.015
     ):
         self.profiling = profiling_data
         self.is_test = is_test
         self.gamma = gamma
+        #self.average_reward_lr = average_reward_lr
         self.alpha_actor = alpha_actor
         self.alpha_critic = alpha_critic
         self.reward_scale = reward_scale
+        # Running estimate of the soft-robust average reward
+        #self.average_reward = 0.0
 
         self.policy_table = {}
         self.value_table = {}
@@ -41,6 +45,7 @@ class TabularActorCriticAgent:
         bw_min_floor = np.floor(np.min(bw_mbps)/8)
         bw_max_ceil = np.ceil(np.max(bw_mbps)/8)
         self.bandwidth_bins = np.linspace(bw_min_floor, bw_max_ceil, 15)
+        
 
         self.cloudtime_bins = np.linspace(0, 45, 20)
 
@@ -64,13 +69,19 @@ class TabularActorCriticAgent:
     def _discretize(self, value, bins):
         idx = np.digitize([value], bins, right=True)[0] - 1
         return float(bins[max(0, min(idx, len(bins) - 1))])
-
+    
     def _state_to_key(self, state):
         # Discretise continuous parts for table lookup
+        # NEw state = (BW, Contention, model segmet, previous assignment vector )
+        # current_bandwidth,      # Updated bandwidth
+            # new_cloud_pending,      # Cloud contention for next layer
+            # next_layer,             # Next layer index
+            # prev_action_pattern,
+
         bw_disc = self._discretize(float(state[0]), self.bandwidth_bins)
         ctime_disc = self._discretize(float(state[1]), self.cloudtime_bins)
-        layer = int(state[2])
         prev_action = state[3]
+        segment = state[2]
 
         if prev_action is None:
             prev_tuple = ()
@@ -82,14 +93,17 @@ class TabularActorCriticAgent:
             else:
                 assignments = np.array(prev_action).flatten()
             prev_tuple = tuple(int(x) for x in assignments)
-
-        return (bw_disc, ctime_disc, layer, prev_tuple)
+        segment_tuple = ()
+        if (isinstance(segment, (list, tuple))):
+            for x in np.asarray(segment):
+                segment_tuple += (x)
+        return (bw_disc, ctime_disc, segment_tuple, prev_tuple)
 
     def _action_to_key(self, action):
         return tuple(int(x) for x in action[:, 1])
 
-    def _get_possible_actions(self, layer_idx):
-        return self.simulator.get_possible_actions(layer_idx)
+    def _get_possible_actions(self):
+        return self.simulator.get_possible_actions()
 
     # -------------------------------------------------------------------------
     # Group Caching Helpers (level only)
@@ -128,11 +142,11 @@ class TabularActorCriticAgent:
     # -------------------------------------------------------------------------
     # Action Selection (group caching uses level‑only key)
     # -------------------------------------------------------------------------
-    def choose_action(self, state, num_groups=None, count=0):
+    def choose_action(self, state, num_groups=None, count=0, layer_index=0):
         original_prev_assignment = state[3] if len(state) > 3 else None
         state_bw = float(state[0])
         state_ctime = float(state[1])
-        layer = int(state[2])
+        layer = self.simulator.get_current_layer_index()
 
         # ========== GROUPED CASE (level‑only caching) ==========
         if num_groups is not None and num_groups > 0:
@@ -144,8 +158,8 @@ class TabularActorCriticAgent:
                 grouped_assignment= self.group_range_assignments[cache_key]
                 cached_assignment_vector = grouped_assignment[0][1]
                 cached_assignments = []
-                for _ in range(self.profiling.get_num_nodes(state[2])):
-                    cached_assignments.append([state[2], (1 if cached_assignment_vector > 0 else 0)])
+                for _ in range(self.profiling.get_num_nodes(self.simulator.get_current_layer_index())):
+                    cached_assignments.append([self.simulator.get_current_layer_index(), (1 if cached_assignment_vector > 0 else 0)])
                 return np.array(cached_assignments), count
         
             # Simulate the whole chunk using the current state (raw values)
@@ -178,9 +192,9 @@ class TabularActorCriticAgent:
             self.group_range_assignments[cache_key] = chosen_action
             assignment_vector = chosen_action[0][1]
             actions = []
-            current_layer = state[2]
+            current_layer = self.simulator.get_current_layer_index()
             for _ in range(self.profiling.get_num_nodes(current_layer)):
-                actions.append([state[2], (1 if assignment_vector > 0 else 0)])
+                actions.append([current_layer, (1 if assignment_vector > 0 else 0)])
             return np.array(actions), count
 
         # ========== NON‑GROUPED CASE (original) ==========
@@ -211,7 +225,7 @@ class TabularActorCriticAgent:
     # Policy action helper (used by both paths)
     # -------------------------------------------------------------------------
     def _get_policy_action(self, state):
-        actions = self._get_possible_actions(int(state[2]))
+        actions = self._get_possible_actions()
         state_key = self._state_to_key(state)
 
         preferences = []
@@ -237,11 +251,11 @@ class TabularActorCriticAgent:
     # -------------------------------------------------------------------------
     def step(self, current_state, num_groups=None, count=0):
         start_time = time.time()
-        action, cached_count = self.choose_action(current_state, num_groups=num_groups, count=count)
+        action, cached_count = self.choose_action(current_state, num_groups=num_groups, count=count, layer_index= self.simulator.get_current_layer_index())
         # print(f"action for label {current_state[2]} is {action}")
         overhead_time_per_step = time.time() - start_time
 
-        layer = int(current_state[2])
+        layer = self.simulator.get_current_layer_index()
         next_layer = min(layer + 1, len(self.profiling.layers) - 1)
 
         cloud_waiting_time = self.simulator.get_next_state_cloud_waiting_time(
@@ -283,44 +297,55 @@ class TabularActorCriticAgent:
         V_current = self.value_table.get(state_key, 0.0)
         if done:
             target = reward
+            # V_next = 0.0
         else:
             V_next = self.value_table.get(next_state_key, 0.0)
             target = reward + self.gamma * V_next
 
-        td_error = np.clip(target - V_current, -10.0, 10.0)
+        #soft-robust average reward update 
+        # self.average_reward = (
+        #     (1.0 -self.average_reward_lr) * self.average_reward + self.average_reward_lr * reward 
+        # )
+        #soft robut td error
+
+        td_error = np.clip(target - V_current, -5000.0, 5000.0)
+        # td_error = (reward-self.average_reward + V_next - V_current)
+        # td_error = np.clip(td_error, -10.0, 10.0)
+
 
         # Update critic
         self.value_table[state_key] = V_current + self.alpha_critic * td_error
 
         # Update actor
-        layer = int(state[2])
-        actions = self._get_possible_actions(layer)
-        prefs = []
-        for a in actions:
-            akey = self._action_to_key(a)
-            prefs.append(self.policy_table.get((state_key, akey), 0.0))
-        prefs = np.array(prefs)
+        # layer = self.simulator.get_current_layer_index()
+        actions = self._get_possible_actions()
+        td_error = 0.0
+        if (actions != []):
+            prefs = []
+            for a in actions:
+                akey = self._action_to_key(a)
+                prefs.append(self.policy_table.get((state_key, akey), 0.0))
+            prefs = np.array(prefs)
 
-        scaled = prefs / max(self.temperature, 1e-8)
-        scaled -= np.max(scaled)
-        probs = np.exp(scaled) / np.sum(np.exp(scaled))
+            scaled = prefs / max(self.temperature, 1e-8)
+            scaled -= np.max(scaled)
+            probs = np.exp(scaled) / np.sum(np.exp(scaled))
+            # Find index of chosen action
+            chosen_idx = None
+            for i, a in enumerate(actions):
+                if self._action_to_key(a) == action_key:
+                    chosen_idx = i
+                    break
 
-        # Find index of chosen action
-        chosen_idx = None
-        for i, a in enumerate(actions):
-            if self._action_to_key(a) == action_key:
-                chosen_idx = i
-                break
-
-        for i, a in enumerate(actions):
-            akey = self._action_to_key(a)
-            old = self.policy_table.get((state_key, akey), 0.0)
-            if i == chosen_idx:
-                grad = td_error * (1 - probs[i])
-            else:
-                grad = -td_error * probs[i]
-            new_pref = old + self.alpha_actor * grad
-            self.policy_table[(state_key, akey)] = np.clip(new_pref, -500.0, 500.0)
+            for i, a in enumerate(actions):
+                akey = self._action_to_key(a)
+                old = self.policy_table.get((state_key, akey), 0.0)
+                if i == chosen_idx:
+                    grad = td_error * (1 - probs[i])
+                else:
+                    grad = -td_error * probs[i]
+                new_pref = old + self.alpha_actor * grad
+                self.policy_table[(state_key, akey)] = np.clip(new_pref, -500.0, 500.0)
 
         return td_error
 

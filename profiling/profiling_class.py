@@ -18,7 +18,8 @@ class ProfilingData:
         dependencies,
         number_of_op_tokens,
         graph_index, 
-        dual_dependency_nodes 
+        dual_dependency_nodes, 
+        model_boundary_layers
 
     ):
         self.numberOfEdgeDevice = numberOfEdgeDevice
@@ -35,8 +36,8 @@ class ProfilingData:
         self.dependencies = dependencies
         self.numberOfOpTokens = number_of_op_tokens
         self.graph_index = graph_index
-        self.dual_dependency_nodes = dual_dependency_nodes
-
+        self.dual_dependency_nodes = dual_dependency_nodes,
+        self.model_boundary_layers = model_boundary_layers
     def get_num_nodes(self, layer_idx):
         return len(self.layers[layer_idx])
 

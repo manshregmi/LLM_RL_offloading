@@ -403,7 +403,7 @@ def get_LLM_profiling_data():
         [0],        # BART 99
         [0],        # BART 100
     ]
-    numberOfEdgeDevice = 5
+    numberOfEdgeDevice = 12
     # -------------------------------
     # ⏱️ Edge execution times (ms)
     # -------------------------------
@@ -2039,7 +2039,11 @@ def get_LLM_profiling_data():
     # Replace (or set) the value for key (0,0) to 100
     number_of_op_tokens[(0, 0)] = 100
     dual_dependency_nodes = [(0,0)]
-
+    model_boundary_layers = [
+        [0,0],
+        [0,100],
+        [100,300]   
+    ]
 
     profiling_data = ProfilingData(
         numberOfEdgeDevice=numberOfEdgeDevice,
@@ -2056,7 +2060,8 @@ def get_LLM_profiling_data():
         dependencies=dependencies,
         number_of_op_tokens=number_of_op_tokens,
         graph_index='graph1',
-        dual_dependency_nodes= dual_dependency_nodes
+        dual_dependency_nodes= dual_dependency_nodes, 
+        model_boundary_layers= model_boundary_layers
 
     )
     return profiling_data

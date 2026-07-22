@@ -121,13 +121,14 @@ class CloudEdgeSimulator:
         self.cumulative_time_seconds = 0.0
         self.episode_offset = 0.0
         self.episode_start_time = 0.0
-        self.i = random.randint(0, 3)
-        self.j = random.randint(0, 3)
-        self.k = random.randint(0, 3)
+        self.i = random.randint(0, 4)
+        self.j = random.randint(0, 4)
+        self.k = random.randint(0, 4)
         self.isEos1 = False
         self.isEos2 = False
         self.total_generated_tokens = 0
         self.previous_parent_node_assignment = None
+        self.layer_index = 0
 
         self.eos_simulator = EosSimulator(graph_index=self.profiling.graph_index)
 
@@ -136,7 +137,7 @@ class CloudEdgeSimulator:
 
 
         self.contention_csv_path = os.path.join("simulator", 'data',"contention.csv")
-        bandwidth_csv_path = os.path.join("simulator", "data","bw_data_public.csv")
+        bandwidth_csv_path = os.path.join("simulator", "data","bw_data.csv")
 
         if bandwidth_csv_path:
             try:
@@ -172,28 +173,35 @@ class CloudEdgeSimulator:
 
     # ================= Action Space =================
 
-    def get_possible_actions(self, layer):
+    def get_possible_actions(self):
         """Generate all possible actions for a given layer"""
-        if layer >= len(self.profiling.layers):
+        if self.layer_index >= len(self.profiling.layers):
             return []
 
-        nodes = self.profiling.get_num_nodes(layer)
+        nodes = self.profiling.get_num_nodes(self.layer_index)
         actions = []
 
         # Last layer: all nodes must be executed on edge
-        if layer == len(self.profiling.layers) - 1:
+        if self.layer_index == len(self.profiling.layers) - 1:
             a = np.zeros((nodes, 2), dtype=int)
-            a[:, 0] = layer
+            a[:, 0] = self.layer_index
             return [a]
 
         # Generate all binary patterns for node execution locations
         for pattern in range(2 ** nodes):
             a = np.zeros((nodes, 2), dtype=int)
-            a[:, 0] = layer
+            a[:, 0] = self.layer_index
             for i in range(nodes):
                 a[i, 1] = (pattern >> i) & 1  # 0 = edge, 1 = cloud
             actions.append(a)
         return actions
+    
+
+    def get_current_layer_index(self):
+        return self.layer_index
+    
+    def reset_layer_count(self):
+        self.layer_index = 0
 
     # ================= Cloud Waiting Time =================
 
@@ -201,8 +209,7 @@ class CloudEdgeSimulator:
         """
         Calculate cloud waiting time for the next layer based on current action.
         """
-        layer = int(next_layer)
-       
+
         # Find nodes assigned to cloud in current layer
         cloud_nodes = np.where(current_action[:, 1] == 1)[0]
 
@@ -249,7 +256,7 @@ class CloudEdgeSimulator:
  
         contention = 0
 
-        relative_layer = layer % 400
+        relative_layer = self.layer_index % 400
         if relative_layer <= 1:
             contention = yolos_cont
         elif 2 < relative_layer < 300:
@@ -262,7 +269,7 @@ class CloudEdgeSimulator:
         # Add processing time from cloud nodes
         if len(cloud_nodes) > 0:
             cloud_proc_ms = max(
-                self.profiling.get_node_cloud_time(layer, i)
+                self.profiling.get_node_cloud_time(self.layer_index, i)
                 for i in cloud_nodes
             )
             new_cloud_pending += max(0.0, cloud_proc_ms)
@@ -270,7 +277,7 @@ class CloudEdgeSimulator:
         # Special case: all nodes to cloud
         if isAllCloud and len(cloud_nodes) > 0:
             cloud_proc_ms = max(
-                self.profiling.get_node_cloud_time(layer, i)
+                self.profiling.get_node_cloud_time(self.layer_index, i)
                 for i in cloud_nodes
             )
             new_cloud_pending = cloud_proc_ms * self.profiling.numberOfEdgeDevice 
@@ -293,25 +300,37 @@ class CloudEdgeSimulator:
             next_state: New state tuple
             terminal: Whether episode is complete
         """
-        _, _, layer, _ = current_state
-        layer = int(layer)
+        layer = int(self.layer_index)
        
         # Get current bandwidth
         current_bandwidth = self.get_current_bandwidth()
-        self.isEos1, self.isEos2, next_layer, terminal = self.eos_simulator.simulate_eos(layer, len(self.profiling.layers))
+        self.isEos1, self.isEos2, next_layer, terminal = self.eos_simulator.simulate_eos(self.layer_index, len(self.profiling.layers))
+        self.layer_index = next_layer
+
         for i in range(len(action)):
-            number_of_op_tokens = self.profiling.get_number_of_op_tokens(layer, i)
-            if (not self.isEos1 or not self.isEos2 or (i == 0 and layer == 0)):
+            number_of_op_tokens = self.profiling.get_number_of_op_tokens(self.layer_index, i)
+            if (not self.isEos1 or not self.isEos2 or (i == 0 and self.layer_index == 0)):
                 self.total_generated_tokens += number_of_op_tokens                
         
         # Convert previous action to pattern for next state
         prev_action_pattern = self._action_to_pattern(action)
        
+        segment = []
+        if (self.layer_index >= self.profiling.model_boundary_layers[0][0] and self.layer_index <=self.profiling.model_boundary_layers[0][1]):
+            np.append(segment, 0)
+        elif(self.layer_index >= self.profiling.model_boundary_layers[1][0] and self.layer_index <=self.profiling.model_boundary_layers[1][1]):
+            np.append(segment, 1)
+        elif (self.layer_index >= self.profiling.model_boundary_layers[2][0] and self.layer_index <=self.profiling.model_boundary_layers[2][1]):
+            np.append(segment, 2)
+        else:
+            np.append(segment, 3)
+
+
         # New state: [bandwidth, cloud_contention, next_layer, previous_action_pattern]
         next_state = (
             current_bandwidth,      # Updated bandwidth
             new_cloud_pending,      # Cloud contention for next layer
-            next_layer,             # Next layer index
+            segment,             # Next layer index
             prev_action_pattern,    # Current action becomes previous for next layer
         )
        
@@ -349,11 +368,10 @@ class CloudEdgeSimulator:
         Returns:
             float: Latency in seconds
         """
-        bandwidth, _, layer, prev_action = current_state
-        layer = int(layer)
+        bandwidth, _, _, prev_action = current_state
 
-        for l, _ in self.profiling.dual_dependency_nodes:
-            if l == layer:
+        for l in self.profiling.dual_dependency_nodes:
+            if l == self.layer_index:
                 self.previous_parent_node_assignment = current_action[0][1]
 
         profiling = self.profiling
@@ -362,7 +380,7 @@ class CloudEdgeSimulator:
         # ========== 1. TRANSMISSION TIME (Data transfer) ==========
         transmission_times = []
 
-        if prev_action is not None and layer > 0:
+        if prev_action is not None and self.layer_index > 0:
             # Data transfer between layers
             prev_assignments = prev_action  # Already a tuple of assignments
             curr_assignments = np.asarray(current_action[:, 1], dtype=int)
@@ -373,10 +391,10 @@ class CloudEdgeSimulator:
             for curr_node in range(len(curr_assignments)):
 
                 if  (not (self.isEos2 and (not self.isEos1) and curr_node > 0)) or (not ((not self.isEos2) and (self.isEos1) and curr_node < 1)):
-                    parent_nodes = deps.get((layer, curr_node), [])
+                    parent_nodes = deps.get((self.layer_index, curr_node), [])
                     for (p_layer, p_node) in parent_nodes:
                         # SAFETY CHECK: Ensure parent is from previous layer and index in bounds
-                        if p_layer == layer-1:
+                        if p_layer == self.layer_index-1:
                             parent_loc = prev_assignments[p_node]
                         else:
                             if self.previous_parent_node_assignment is not None:
@@ -389,7 +407,7 @@ class CloudEdgeSimulator:
 
                         if parent_loc != curr_loc:
                             # Data must be transmitted
-                            output_size = profiling.get_output_size(layer, curr_node)
+                            output_size = profiling.get_output_size(self.layer_index, curr_node)
 
                             # Transmission time = data size / bandwidth (with RTT floor)
                             transmission_time = max(
@@ -418,7 +436,7 @@ class CloudEdgeSimulator:
         for i in range(len(current_action)):
             if  (not (self.isEos2  and (not self.isEos1) and  i > 0)) or (not ((not self.isEos2) and self.isEos1 and (i < 1))):
                 if current_action[i, 1] == 0:  # Edge execution
-                    node_t_s = profiling.get_node_edge_time(layer, i) / 1000.0
+                    node_t_s = profiling.get_node_edge_time(self.layer_index, i) / 1000.0
                     edge_times.append(node_t_s)
 
 
@@ -448,7 +466,7 @@ class CloudEdgeSimulator:
 
         # Update cumulative time
         self.cumulative_time_seconds += completion_time_s
-        # print(f"EOS1 {self.isEos1} and  EOS 2 {self.isEos2} has total time {completion_time_s*1000} for level {current_state[2]} with bandwidth {current_state[0]}  and cloudlet contetion {current_state[1]} and assignment vector is {current_action}", )
+        #print(f"EOS1 {self.isEos1} and  EOS 2 {self.isEos2} has total time {completion_time_s*1000} for level {self.layer_index} with bandwidth {current_state[0]}  and cloudlet contetion {current_state[1]} and assignment vector is {current_action}", )
         return completion_time_s
 
     # ================= PURE LATENCY REWARD =================
@@ -463,11 +481,10 @@ class CloudEdgeSimulator:
         Args:
             latency_s: Latency in seconds
             scale_factor: Scaling factor for reward magnitude
-            
         Returns:
             float: Reward value
         """
-        latency_ms = latency_s * scale_factor
+        latency_ms = latency_s * 10000
         return -latency_ms
 
     # ================= BACKWARD COMPATIBILITY METHODS =================
