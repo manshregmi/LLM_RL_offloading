@@ -126,7 +126,7 @@ class TabularActorCriticAgent:
         return tuple(int(action_2d[i, 1]) for i in range(action_2d.shape[0]))
 
     def _get_default_action(self, layer):
-        possible = self._get_possible_actions(layer)
+        possible = self._get_possible_actions()
         if possible:
             n_nodes = possible[0].shape[0]
         else:
@@ -198,7 +198,7 @@ class TabularActorCriticAgent:
             return np.array(actions), count
 
         # ========== NON‑GROUPED CASE (original) ==========
-        actions = self._get_possible_actions(layer)
+        actions = self._get_possible_actions()
         state_key = self._state_to_key(state)
 
         preferences = []
@@ -319,7 +319,7 @@ class TabularActorCriticAgent:
         # Update actor
         # layer = self.simulator.get_current_layer_index()
         actions = self._get_possible_actions()
-        td_error = 0.0
+        # td_error = 0.0
         if (actions != []):
             prefs = []
             for a in actions:
@@ -356,7 +356,9 @@ class TabularActorCriticAgent:
         self.current_episode_latency = 0.0
         self.current_episode_reward = 0.0
         self.simulator.reset_episode_time()
+        self.simulator.reset_layer_count()
         self.group_range_assignments.clear()
+
 
     def end_episode(self):
         total_latency = self.current_episode_latency
