@@ -1697,10 +1697,11 @@ def get_graph3():
 
     #print("Number of op tokens for each node:", number_of_op_tokens)
     model_boundary_layers = [
-        0, #Yolos and two Llamas 
-        100, # two barts   
-        150, # final bart     
-    ]
+        (0, 0, (0, 1, 2)),         # YOLOS and two LLaMAs
+        (1, 99, (1, 2)),           # Two parallel LLaMAs
+        (100, 149, (3, 4)),        # Two parallel BARTs
+        (150, 249, (5,)),          # Final BART
+]
 
 
 

@@ -17,8 +17,8 @@ def create_initial_state(simulator):
     bandwidth = simulator.get_current_bandwidth()
     cloud_contention = 0.0  # No pending cloud tasks at start
     previous_assignment = None  # No previous layer
-    
-    return (bandwidth, cloud_contention, 0, previous_assignment)
+    segment = simulator.get_segment_tuple(0)
+    return (bandwidth, cloud_contention,segment, previous_assignment)
 
 def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False, verbose=True, total_pipelines=1): 
     """Main training loop."""
@@ -61,6 +61,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
     state = create_initial_state(agent.simulator)
     bandwidth = state[0]
     cloud_contention = state[1]
+    segment = agent.simulator.get_segment_tuple(0)
     last_pipeline_contention = []
     average_last_pipeline_contention = 0.0
     state = (bandwidth, cloud_contention, 0, None)  # Start at segment 0 with no previous assignment
@@ -72,7 +73,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
     episode_generated_tokens= []
     for episode in range(NUM_EPISODES):
         rewards_ep = 0
-        state = (bandwidth, cloud_contention, 0, None)
+        state = (bandwidth, cloud_contention, segment, None)
         # Start episode
         agent.start_episode()
         done = False

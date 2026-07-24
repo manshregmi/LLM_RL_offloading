@@ -170,6 +170,24 @@ class CloudEdgeSimulator:
             return float(bw_mbps / 8.0)  # Convert to
         return float(random.uniform(5, 100))
         # return 12 
+    def get_segment_tuple(self, layer_index):
+        """
+        Return the model-segment tuple for a layer.
+
+        The tuple order must match the node order in the layer/action array.
+        """
+
+        layer_index = int(layer_index)
+
+        # A terminal next state may be outside the valid layer range.
+        if layer_index < 0 or layer_index >= len(self.profiling.layers):
+            return ()
+
+        for start_layer, end_layer, segments in self.profiling.model_boundary_layers:
+            if start_layer <= layer_index <= end_layer:
+                segment_tuple = tuple(int(segment) for segment in segments)
+                return segment_tuple
+
 
     # ================= Action Space =================
 
@@ -314,16 +332,24 @@ class CloudEdgeSimulator:
         
         # Convert previous action to pattern for next state
         prev_action_pattern = self._action_to_pattern(action)
+        if terminal: 
+            segment = ()
+        else: 
+           segment = self.get_segment_tuple(self.layer_index)  
        
-        segment = []
-        if (self.layer_index >= self.profiling.model_boundary_layers[0][0] and self.layer_index <=self.profiling.model_boundary_layers[0][1]):
-            np.append(segment, 0)
-        elif(self.layer_index >= self.profiling.model_boundary_layers[1][0] and self.layer_index <=self.profiling.model_boundary_layers[1][1]):
-            np.append(segment, 1)
-        elif (self.layer_index >= self.profiling.model_boundary_layers[2][0] and self.layer_index <=self.profiling.model_boundary_layers[2][1]):
-            np.append(segment, 2)
-        else:
-            np.append(segment, 3)
+        # segment = []
+        # if (self.layer_index >= self.profiling.model_boundary_layers[0][0] and self.layer_index <=self.profiling.model_boundary_layers[0][1]):
+        #     np.append(segment, 0)
+        #     # segment.append(0)
+        # elif(self.layer_index >= self.profiling.model_boundary_layers[1][0] and self.layer_index <=self.profiling.model_boundary_layers[1][1]):
+        #     np.append(segment, 1)
+        #     #segment.append(1)
+        # elif (self.layer_index >= self.profiling.model_boundary_layers[2][0] and self.layer_index <=self.profiling.model_boundary_layers[2][1]):
+        #     np.append(segment, 2)
+        #     #segment.append(2)
+        # else:
+        #     np.append(segment, 3)
+        #     #segment.append(3)
 
 
         # New state: [bandwidth, cloud_contention, next_layer, previous_action_pattern]
@@ -466,7 +492,7 @@ class CloudEdgeSimulator:
 
         # Update cumulative time
         self.cumulative_time_seconds += completion_time_s
-        #print(f"EOS1 {self.isEos1} and  EOS 2 {self.isEos2} has total time {completion_time_s*1000} for level {self.layer_index} with bandwidth {current_state[0]}  and cloudlet contetion {current_state[1]} and assignment vector is {current_action}", )
+        print(f"EOS1 {self.isEos1} and  EOS 2 {self.isEos2} has total time {completion_time_s*1000} for level {self.layer_index} with bandwidth {current_state[0]}  and cloudlet contetion {current_state[1]} and segment {current_state[2]} and assignment vector is {current_action}", )
         return completion_time_s
 
     # ================= PURE LATENCY REWARD =================

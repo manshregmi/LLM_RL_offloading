@@ -96,7 +96,7 @@ class TabularActorCriticAgent:
         segment_tuple = ()
         if (isinstance(segment, (list, tuple))):
             for x in np.asarray(segment):
-                segment_tuple += (x)
+                segment_tuple += (x,)
         return (bw_disc, ctime_disc, segment_tuple, prev_tuple)
 
     def _action_to_key(self, action):

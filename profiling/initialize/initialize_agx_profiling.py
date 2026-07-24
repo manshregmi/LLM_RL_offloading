@@ -2040,10 +2040,10 @@ def get_LLM_profiling_data():
     number_of_op_tokens[(0, 0)] = 100
     dual_dependency_nodes = [(0,0)]
     model_boundary_layers = [
-        [0,0],
-        [0,100],
-        [100,300]   
-    ]
+        (0, 0, (0, 1)),            # YOLOS and LLaMA at level 0
+        (1, 99, (1,)),             # First LLaMA portion
+        (100, 299, (2,)),          # Second LLaMA portion
+        (300, 399, (3,)), ]  # BART
 
     profiling_data = ProfilingData(
         numberOfEdgeDevice=numberOfEdgeDevice,
