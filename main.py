@@ -8,7 +8,7 @@ import os
 from profiling.initialize.initialize_agx_profiling import get_LLM_profiling_data
 from profiling.initialize.initialize_graph2 import get_graph2
 from profiling.initialize.initialize_graph3 import get_graph3
-from runner.run_a2c import train_a2c_agent
+from runner.run_a2c import  train_a2c_agent
 from baselines.hurustic_baselines import run_scheduler 
 import matplotlib.pyplot  as plt
 
@@ -153,8 +153,8 @@ if __name__ == "__main__":
     print("=" * 80)
     print("LOADING PROFILING DATA")
     print("=" * 80)
-    #profiling_data = get_LLM_profiling_data()
-    profiling_data = get_graph3()
+    profiling_data = get_LLM_profiling_data()
+    #profiling_data = get_graph3()
     #profiling_data = get_graph2()
     pipleline_overhead_time = []
 

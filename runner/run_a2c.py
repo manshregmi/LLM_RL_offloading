@@ -19,19 +19,92 @@ def create_initial_state(simulator):
     previous_assignment = None  # No previous layer
     segment = simulator.get_segment_tuple(0)
     return (bandwidth, cloud_contention,segment, previous_assignment)
+# def build_bandwidth_uncertainty_models():
+#     """
+#     Build a bandwidth-only uncertainty set using the
+#     minimum, average, median, and maximum bandwidth
+#     statistics from the trace.
+
+#     All bandwidth values in this function are in Mbps.
+#     """
+
+#     minimum_bw = 0.7
+#     average_bw = 52.68
+#     median_bw = 61.4
+#     maximum_bw = 125.8
+
+#     # Representative bandwidth conditions.
+#     poor_bw = (minimum_bw + median_bw) / 2.0
+#     nominal_bw = median_bw
+#     good_bw = (median_bw + maximum_bw) / 2.0
+
+#     # Keep half of the probability mass on the nominal model.
+#     nominal_weight = 0.50
+#     remaining_weight = 1.0 - nominal_weight
+
+#     # Solve the poor and good weights such that:
+#     #
+#     # poor_weight + nominal_weight + good_weight = 1
+#     #
+#     # poor_weight * poor_bw
+#     # + nominal_weight * nominal_bw
+#     # + good_weight * good_bw
+#     # = average_bw
+#     poor_weight = (
+#         average_bw
+#         - nominal_weight * nominal_bw
+#         - remaining_weight * good_bw
+#     ) / (
+#         poor_bw - good_bw
+#     )
+
+#     good_weight = remaining_weight - poor_weight
+
+#     weights = np.asarray(
+#         [
+#             poor_weight,
+#             nominal_weight,
+#             good_weight,
+#         ],
+#         dtype=float,
+#     )
+
+
+#     weights /= weights.sum()
+
+#     uncertainty_models = [
+#         {
+#             "name": "poor_bandwidth",
+#             "weight": float(weights[0]),
+#             "bandwidth_mbps": float(poor_bw),
+#         },
+#         {
+#             "name": "nominal_bandwidth",
+#             "weight": float(weights[1]),
+#             "bandwidth_mbps": float(nominal_bw),
+#         },
+#         {
+#             "name": "good_bandwidth",
+#             "weight": float(weights[2]),
+#             "bandwidth_mbps": float(good_bw),
+#         },
+#     ]
+#     return uncertainty_models
+
 
 def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False, verbose=True, total_pipelines=1): 
     """Main training loop."""
-    
+    uncertainty_models = None
     # Create agent
     agent = TabularActorCriticAgent(
         profiling_data=profiling_data,
         is_test=is_test,
-        alpha_actor=0.25,
-        alpha_critic=0.25,
-        gamma=0.7,
-        #average_reward_lr= 0.15,
-        reward_scale=10.0,  # Scale reward magnitude
+        alpha_actor=0.02,
+        alpha_critic=0.05,
+        #gamma=0.7,
+        average_reward_lr= 0.15,
+        uncertainty_models = uncertainty_models, 
+        reward_scale=10,  # Scale reward magnitude
         total_pipelines=total_pipelines
     )
     agent.simulator.reset_layer_count()

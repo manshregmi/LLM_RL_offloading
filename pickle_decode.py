@@ -1,54 +1,68 @@
 import pickle
 import numpy as np
-import sys
-import types
- 
-# ------------------------------------------------------------
-# Your NumPy compatibility fix (keep as is)
-# ------------------------------------------------------------
-core_module = types.ModuleType("numpy._core")
-multiarray_module = types.ModuleType("numpy._core.multiarray")
-core_module.multiarray = multiarray_module
- 
-def dummy_scalar(*args, **kwargs):
-    return np.array(args[0] if args else 0)
- 
-multiarray_module.scalar = dummy_scalar
- 
-sys.modules["numpy._core"] = core_module
-sys.modules["numpy._core.multiarray"] = multiarray_module
- 
-# ------------------------------------------------------------
-# Simple, robust recursive printer
-# ------------------------------------------------------------
-def print_all(obj, name="root", indent=0):
-    """Recursively print any object, showing keys for dicts and indices for sequences."""
-    prefix = "  " * indent
-    if isinstance(obj, dict):
-        print(f"{prefix}{name} (dict, {len(obj)} keys)")
-        for k, v in obj.items():
-            print_all(v, f"{name}['{k}']", indent + 1)
-    elif isinstance(obj, (list, tuple)):
-        print(f"{prefix}{name} ({type(obj).__name__}, length {len(obj)})")
-        for i, item in enumerate(obj):
-            print_all(item, f"{name}[{i}]", indent + 1)
-    elif isinstance(obj, np.ndarray):
-        print(f"{prefix}{name} = numpy array shape {obj.shape} dtype {obj.dtype}")
-        # Show a few values if not too large
-        if obj.size <= 20:
-            print(f"{prefix}  values: {obj}")
-        else:
-            print(f"{prefix}  first 5 values: {obj.flat[:5]} ...")
-    else:
-        # Show primitive or other objects
-        print(f"{prefix}{name} = {repr(obj)[:200]}")
- 
-# ------------------------------------------------------------
-# Load and print
-# ------------------------------------------------------------
+
+
+def to_python(value):
+    """Convert NumPy scalar values to standard Python values."""
+    if isinstance(value, np.generic):
+        return value.item()
+
+    if isinstance(value, tuple):
+        return tuple(to_python(x) for x in value)
+
+    if isinstance(value, list):
+        return [to_python(x) for x in value]
+
+    return value
+
+
+def print_value_table(value_table):
+    print("\n=== CRITIC / VALUE TABLE ===")
+    print(f"Number of states: {len(value_table)}\n")
+
+    for index, (state, value) in enumerate(value_table.items(), start=1):
+        bandwidth, contention, segment, previous_assignment = state
+
+        print(f"State {index}")
+        print(f"  Bandwidth bin:       {to_python(bandwidth)}")
+        print(f"  Contention bin:      {to_python(contention)}")
+        print(f"  Segment:             {to_python(segment)}")
+        print(f"  Previous assignment: {to_python(previous_assignment)}")
+        print(f"  Critic value:        {to_python(value)}")
+        print()
+
+
+def print_policy_table(policy_table):
+    print("\n=== ACTOR / POLICY TABLE ===")
+    print(f"Number of entries: {len(policy_table)}\n")
+
+    for index, (key, value) in enumerate(policy_table.items(), start=1):
+        print(f"Policy entry {index}")
+        print(f"  Key:   {to_python(key)}")
+        print(f"  Value: {to_python(value)}")
+        print()
+
+
 file_path = "a2c_tables.pkl"
-with open(file_path, "rb") as f:
-    data = pickle.load(f)
- 
-print("\n=== FULL CONTENTS OF PICKLE FILE ===\n")
-print_all(data, "data")
+
+with open(file_path, "rb") as file:
+    data = pickle.load(file)
+
+print(f"Loaded object type: {type(data).__name__}")
+
+if isinstance(data, (tuple, list)) and len(data) >= 2:
+    policy_table = data[0]
+    value_table = data[1]
+
+    if isinstance(policy_table, dict):
+        print_policy_table(policy_table)
+    else:
+        print(f"data[0] is not a dictionary: {type(policy_table)}")
+
+    if isinstance(value_table, dict):
+        print_value_table(value_table)
+    else:
+        print(f"data[1] is not a dictionary: {type(value_table)}")
+
+else:
+    print("Unexpected pickle structure.")

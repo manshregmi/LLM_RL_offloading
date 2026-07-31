@@ -20,20 +20,23 @@ class TabularActorCriticAgent:
         is_test=False,
         alpha_actor=0.02,
         alpha_critic=0.05,
-        gamma=0.95,
+        #gamma=0.95,
         reward_scale=10.0,
         total_pipelines=1,
-        average_reward_lr=0.015
+        average_reward_lr=0.15,
+        uncertainty_models = None 
     ):
         self.profiling = profiling_data
         self.is_test = is_test
-        self.gamma = gamma
-        #self.average_reward_lr = average_reward_lr
+        #self.gamma = gamma
+        self.average_reward_lr = average_reward_lr
         self.alpha_actor = alpha_actor
         self.alpha_critic = alpha_critic
         self.reward_scale = reward_scale
         # Running estimate of the soft-robust average reward
-        #self.average_reward = 0.0
+        self.average_reward = 0.0
+        #bandwidth distribution 
+        self._uncertainty_models_arg = uncertainty_models 
 
         self.policy_table = {}
         self.value_table = {}
@@ -45,6 +48,10 @@ class TabularActorCriticAgent:
         bw_min_floor = np.floor(np.min(bw_mbps)/8)
         bw_max_ceil = np.ceil(np.max(bw_mbps)/8)
         self.bandwidth_bins = np.linspace(bw_min_floor, bw_max_ceil, 15)
+        if self._uncertainty_models_arg is None:
+            self.uncertainty_models = self._build_empirical_uncertainty_models(bw_mbps)
+        else:
+            self.uncertainty_models = [dict(m) for m in self._uncertainty_models_arg]
         
 
         self.cloudtime_bins = np.linspace(0, 45, 20)
@@ -62,6 +69,36 @@ class TabularActorCriticAgent:
         self.current_episode_reward = 0.0
 
         self.group_range_assignments = {}   # cache: key = (num_groups, chunk_idx)
+
+    ##---------
+    def _build_empirical_uncertainty_models(self, bw_mbps):
+        """
+        Build omega from the empirical bandwidth histogram of the trace,
+        aligned to the value table's own discretization grid. Each occupied
+        bin becomes one uncertainty model: representative bandwidth = mean of
+        the trace samples in that bin (re-discretizes back to the same key),
+        weight = fraction of trace samples in that bin.
+        """
+        bw_MBps = np.asarray(bw_mbps, dtype=float) / 8.0  # grid is in MB/s
+
+        groups = {}
+        for v in bw_MBps:
+            key = self._discretize(float(v), self.bandwidth_bins)
+            groups.setdefault(key, []).append(v)
+
+        keys = sorted(groups)
+        counts = np.array([len(groups[k]) for k in keys], dtype=float)
+        freqs = counts / counts.sum()
+
+        models = []
+        for k, w in zip(keys, freqs):
+            rep_MBps = float(np.mean(groups[k]))
+            models.append({
+                "name": f"bw_bin_{k:.3f}_MBps",
+                "weight": float(w),
+                "bandwidth_mbps": float(rep_MBps * 8.0),
+            })
+        return models    
 
     # -------------------------------------------------------------------------
     # State & Action Helpers
@@ -285,6 +322,62 @@ class TabularActorCriticAgent:
         self.current_episode_reward += reward
 
         return action, reward, latency_s, next_state, done, overhead_time_per_step, cached_count
+    
+    #------------------------------------------
+    # Expected weighted values for next-state critic 
+    #-------------------------------------------
+    def _soft_robust_expected_next_value(self,next_state,done,):
+        """
+        Calculate the weighted next-state critic value
+        under the bandwidth uncertainty models.
+        """
+
+        if done:
+            return 0.0
+
+        cloud_contention = float(
+            next_state[1]
+        )
+
+        segment_id = next_state[2]
+        
+
+        prev_action = next_state[3]
+
+        expected_next_value = 0.0
+
+        for model in self.uncertainty_models:
+            # The empirical values are in Mbps.
+            # RL bandwidth state is in MB/s.
+            scenario_bandwidth = (
+                float(model["bandwidth_mbps"])
+                / 8.0
+            )
+
+            scenario_state = (
+                scenario_bandwidth,
+                cloud_contention,
+                segment_id,
+                prev_action,
+            )
+
+            scenario_key = self._state_to_key(
+                scenario_state
+            )
+
+            scenario_value = float(
+                self.value_table.get(
+                    scenario_key,
+                    0.0,
+                )
+            )
+
+            expected_next_value += (
+                float(model["weight"])
+                * scenario_value
+            )
+
+        return float(expected_next_value)
 
     # -------------------------------------------------------------------------
     # Update (Policy Gradient)
@@ -295,24 +388,27 @@ class TabularActorCriticAgent:
         next_state_key = self._state_to_key(next_state)
 
         V_current = self.value_table.get(state_key, 0.0)
-        if done:
-            target = reward
-            # V_next = 0.0
-        else:
-            V_next = self.value_table.get(next_state_key, 0.0)
-            target = reward + self.gamma * V_next
+        # if done:
+        #     target = reward
+        #     # V_next = 0.0
+        # else:
+        #     V_next = self.value_table.get(next_state_key, 0.0)
+        #     target = reward + self.gamma * V_next
 
         #soft-robust average reward update 
-        # self.average_reward = (
-        #     (1.0 -self.average_reward_lr) * self.average_reward + self.average_reward_lr * reward 
-        # )
-        #soft robut td error
-
-        td_error = np.clip(target - V_current, -5000.0, 5000.0)
-        # td_error = (reward-self.average_reward + V_next - V_current)
+        self.average_reward += (self.average_reward_lr)*(reward - self.average_reward)
+        # Weighted value under poor, nominal and good
+        # bandwidth conditions.
+        expected_next_value = (
+            self._soft_robust_expected_next_value(
+                next_state=next_state,
+                done=done,
+            )
+        )
+        #soft robust td error        
+        td_error = (reward-self.average_reward + expected_next_value - V_current)
+        td_error = np.clip(td_error, -5000.0, 5000.0)
         # td_error = np.clip(td_error, -10.0, 10.0)
-
-
         # Update critic
         self.value_table[state_key] = V_current + self.alpha_critic * td_error
 
@@ -364,6 +460,8 @@ class TabularActorCriticAgent:
         total_latency = self.current_episode_latency
         total_reward = self.current_episode_reward
         self.total_episodes += 1
+        if self.is_test:
+            return total_latency, total_reward
 
         if total_latency < self.best_episode_latency:
             self.best_episode_latency = total_latency
@@ -377,7 +475,7 @@ class TabularActorCriticAgent:
                 print(f"🔥 Temperature boosted to {self.temperature:.3f}")
             else:
                 self.temperature = max(self.temperature_min, self.temperature * self.temperature_decay)
-
+        
         return total_latency, total_reward
 
     # -------------------------------------------------------------------------
@@ -385,13 +483,13 @@ class TabularActorCriticAgent:
     # -------------------------------------------------------------------------
     def save(self, file="a2c_tables.pkl"):
         with open(file, "wb") as f:
-            pickle.dump((self.policy_table, self.value_table), f)
+            pickle.dump((self.policy_table, self.value_table,self.average_reward), f)
         print(f"💾 Agent saved to {file}")
 
     def load(self, file="a2c_tables.pkl"):
         if os.path.exists(file):
             with open(file, "rb") as f:
-                self.policy_table, self.value_table = pickle.load(f)
+                self.policy_table, self.value_table,self.average_reward = pickle.load(f)
             print(f"✅ Agent loaded from {file}")
         else:
             print(f"⚠️ File {file} not found. Starting from scratch.")
