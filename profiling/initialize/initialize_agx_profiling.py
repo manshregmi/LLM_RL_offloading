@@ -1656,16 +1656,16 @@ def get_LLM_profiling_data():
         (27,0): [(26,0)],
         (28,0): [(27,0)],
         (29,0): [(28,0)],
-        (30,0): [(30,0)],
-        (31,0): [(31,0)],
-        (32,0): [(32,0)],
-        (33,0): [(33,0)],
-        (34,0): [(34,0)],
-        (35,0): [(35,0)],
-        (36,0): [(36,0)],
-        (37,0): [(37,0)],
-        (38,0): [(38,0)],
-        (39,0): [(39,0)],
+        (30,0): [(29,0)],
+        (31,0): [(30,0)],
+        (32,0): [(31,0)],
+        (33,0): [(32,0)],
+        (34,0): [(33,0)],
+        (35,0): [(34,0)],
+        (36,0): [(35,0)],
+        (37,0): [(36,0)],
+        (38,0): [(37,0)],
+        (39,0): [(38,0)],
         (40,0): [(39,0)],
         (41,0): [(40,0)],
         (42,0): [(41,0)],
@@ -2039,11 +2039,17 @@ def get_LLM_profiling_data():
     # Replace (or set) the value for key (0,0) to 100
     number_of_op_tokens[(0, 0)] = 100
     dual_dependency_nodes = [(0,0)]
+    # model_boundary_layers = [
+    #     (0, 0, (0, 1)),            # YOLOS and LLaMA at level 0
+    #     (1, 99, (1,)),             # First LLaMA portion
+    #     (100, 299, (2,)),          # Second LLaMA portion
+    #     (300, 399, (3,)), ]  # BART
     model_boundary_layers = [
-        (0, 0, (0, 1)),            # YOLOS and LLaMA at level 0
-        (1, 99, (1,)),             # First LLaMA portion
-        (100, 299, (2,)),          # Second LLaMA portion
-        (300, 399, (3,)), ]  # BART
+    (0, 0, (0, 1), (1, 0)),          # YOLOS(1), Llama(0)
+    (1, 99, (0,), (0,)),             # Llama
+    (100, 299, (0,), (0,)),          # Llama
+    (300, 399, (0,), (2,)),          # Bart
+    ]
 
     profiling_data = ProfilingData(
         numberOfEdgeDevice=numberOfEdgeDevice,
