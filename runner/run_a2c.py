@@ -21,6 +21,7 @@ def create_initial_state(simulator):
     segment = simulator.get_segment_tuple(0)
     return (bandwidth, cloud_contention,segment, previous_assignment)
 
+
 def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False, verbose=True, total_pipelines=1): 
     """Main training loop."""
     
@@ -36,7 +37,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         total_pipelines=total_pipelines
     )
     agent.simulator.reset_layer_count()
-    contention_trace_path = os.path.join("simulator","data","contention_log_20260807_141244")
+    contention_trace_path = os.path.join("simulator","data","contention_log_20260811_103925.csv")
     agent.simulator.load_contention_trace(contention_trace_path)
 
     grouping_RL_agent = GroupingRL(total_pipelines=total_pipelines)

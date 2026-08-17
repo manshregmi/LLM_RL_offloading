@@ -262,6 +262,20 @@ class CloudEdgeSimulator:
             if start_layer <= layer_index <= end_layer:
                 segment_tuple = tuple(int(segment) for segment in segments)
                 return segment_tuple
+    def _get_model_idx(self, layer, node):
+        """
+        Return model index (0=Llama, 1=Yolos, 2=Bart) for a given (layer, node).
+        Uses model_boundary_layers extended with model tuples if available.
+        """
+        layer = int(self.layer_index)
+        node = int(node)
+        # Try the extended 4‑tuple format (start, end, segments, models)
+        if self.profiling.model_boundary_layers and len(self.profiling.model_boundary_layers[0]) == 4:
+            for start, end, segments, models in self.profiling.model_boundary_layers:
+                if start <= layer <= end:
+                    if node < len(models):
+                        return models[node]
+                    return models[0] if models else 0
 
 
     # ================= Action Space =================
@@ -298,49 +312,122 @@ class CloudEdgeSimulator:
 
     # ================= Cloud Waiting Time =================
 
-    def get_next_state_cloud_waiting_time(self, next_layer, current_action, isAllCloud=False):
+    #def get_next_state_cloud_waiting_time(self, next_layer, current_action, isAllCloud=False):
         """
         Calculate cloud waiting time for the next layer based on current action.
+        
         """
-        self.i ,self.j, self.k = self.get_contention_at_time(
+        # self.i, self.j, self.k = self.get_contention_at_time(
+        # self.cumulative_time_seconds + self.episode_offset)  
+
+        # key = (self.i, self.j, self.k)
+        # row = self.contention_map.get(key)
+
+        # if row is None:
+        #     llama_extra = yolos_extra = bart_extra = 0.0
+        # else:
+        #     llama_extra = row["llama_extra"]
+        #     yolos_extra = row["yolos_extra"]
+        #     bart_extra = row["bart_extra"]
+
+        # contention = 0.0
+        # relative_layer = self.layer_index % 400
+        # if relative_layer <= 1:
+        #     contention = yolos_extra
+        # elif 2 < relative_layer < 300:
+        #     contention = llama_extra
+        # elif 300 < relative_layer < 400:
+        #     contention = bart_extra
+        # # Find nodes assigned to cloud in current layer
+        # cloud_nodes = np.where(current_action[:, 1] == 1)[0]
+        # new_cloud_pending = contention
+ 
+        # # Add processing time from cloud nodes
+        # if len(cloud_nodes) > 0:
+        #     cloud_proc_ms = max(
+        #         self.profiling.get_node_cloud_time(self.layer_index, i)
+        #         for i in cloud_nodes
+        #     )
+        #     new_cloud_pending += max(0.0, cloud_proc_ms)
+ 
+        # # Special case: all nodes to cloud
+        # if isAllCloud and len(cloud_nodes) > 0:
+        #     cloud_proc_ms = max(
+        #         self.profiling.get_node_cloud_time(self.layer_index, i)
+        #         for i in cloud_nodes
+        #     )
+        #     new_cloud_pending = cloud_proc_ms * self.profiling.numberOfEdgeDevice
+        
+        # return new_cloud_pending
+    def get_next_state_cloud_waiting_time(self,next_layer,current_action,isAllCloud=False):
+        """
+        Calculate cloud waiting time for the current layer/action.
+
+        RL uses segment in the state, but latency is computed
+        using the exact current layer.
+        """
+
+        layer = int(self.layer_index)
+
+        # Get current contention from generated trace
+        self.i, self.j, self.k = self.get_contention_at_time(
             self.cumulative_time_seconds + self.episode_offset
         )
+
         key = (self.i, self.j, self.k)
         row = self.contention_map.get(key)
-        if row is None: 
-           llama_extra = yolos_extra = bart_extra = 0.0
-        else: 
-            llama_extra = row['llama_extra']
-            yolos_extra = row ['yolos_extra'] 
-            bart_extra = row ['bart_extra']            
-        contention = 0
-        relative_layer = self.layer_index % 400
-        if relative_layer <= 1:
-            contention = yolos_extra
-        elif 2 < relative_layer < 300:
-            contention = llama_extra
-        elif 300 < relative_layer < 400:
-            contention = bart_extra
-        # Find nodes assigned to cloud in current layer
+
+        if row is None:
+            llama_extra = 0.0
+            yolos_extra = 0.0
+            bart_extra = 0.0
+        else:
+            llama_extra = float(row["llama_extra"])
+            yolos_extra = float(row["yolos_extra"])
+            bart_extra = float(row["bart_extra"])
+
+        # Find cloud nodes in CURRENT layer
         cloud_nodes = np.where(current_action[:, 1] == 1)[0]
-        new_cloud_pending = contention
- 
-        # Add processing time from cloud nodes
-        if len(cloud_nodes) > 0:
-            cloud_proc_ms = max(
-                self.profiling.get_node_cloud_time(self.layer_index, i)
-                for i in cloud_nodes
+
+        # No cloud execution
+        if len(cloud_nodes) == 0:
+            return 0.0
+
+        effective_cloud_times = []
+
+        for node_idx in cloud_nodes:
+
+            node_idx = int(node_idx)
+
+            model_idx = self._get_model_idx(
+                layer,
+                node_idx
             )
-            new_cloud_pending += max(0.0, cloud_proc_ms)
- 
-        # Special case: all nodes to cloud
-        if isAllCloud and len(cloud_nodes) > 0:
-            cloud_proc_ms = max(
-                self.profiling.get_node_cloud_time(self.layer_index, i)
-                for i in cloud_nodes
-            )
-            new_cloud_pending = cloud_proc_ms * self.profiling.numberOfEdgeDevice 
-        return new_cloud_pending
+
+            if model_idx == 0:       # LLaMA
+                contention_extra = llama_extra
+
+            elif model_idx == 1:     # YOLOS
+                contention_extra = yolos_extra
+
+            elif model_idx == 2:     # BART
+                contention_extra = bart_extra
+
+            else:
+                contention_extra = 0.0
+
+            cloud_proc_ms = float(self.profiling.get_node_cloud_time(layer,node_idx))
+
+            effective_cloud_times.append(max(0.0, cloud_proc_ms)+ max(0.0, contention_extra))
+
+        # Multiple cloud nodes execute in parallel.
+        # Waiting time is determined by the slowest cloud node.
+        new_cloud_pending = max(effective_cloud_times)
+
+        if isAllCloud:
+            new_cloud_pending *= (self.profiling.numberOfEdgeDevice)
+
+        return float(new_cloud_pending)
  
     # ================= Next State (Simplified - No Surplus) =================
  
@@ -551,7 +638,7 @@ class CloudEdgeSimulator:
         Returns:
             float: Reward value
         """
-        latency_ms = latency_s * 10000
+        latency_ms = latency_s * 1000
         return -latency_ms
 
     # ================= BACKWARD COMPATIBILITY METHODS =================
@@ -571,3 +658,4 @@ class CloudEdgeSimulator:
         Simplified reward calculation - ignores deadline/surplus parameters.
         """
         return self.calculate_latency_reward(completion_time_s, scale_factor=1.0)
+        

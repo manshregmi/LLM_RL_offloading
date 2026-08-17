@@ -45,7 +45,7 @@ def main():
     # Run simulation
     sim.simulate_concurrent(
         num_threads=9,
-        episodes_per_thread=10,
+        episodes_per_thread=100,
         use_tft=False
     )
 

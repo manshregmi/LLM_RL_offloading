@@ -190,9 +190,6 @@ class CloudEdgeSimulator:
     def get_current_bandwidth_mbps(self) -> float:
         return self._get_bandwidth_at_global_time(self.cumulative_time_seconds)
     
-    def _get_bandwidth_MBps_at_global_time(self, global_time: float) -> float:
-        bandwidth_mbps = self._get_bandwidth_at_global_time(global_time)
-        return bandwidth_mbps / 8.0
 
     def get_current_rtt_ms(self) -> float:
         return self._get_rtt_at_global_time(self.cumulative_time_seconds)
@@ -346,7 +343,7 @@ class CloudEdgeSimulator:
         action_matrix: np.ndarray,
         cloud_pending_ms: float,
         prev_action_pattern: Optional[Tuple[int, ...]],
-        bandwidth_MBps: float,
+        bandwidth: float,
         rtt_ms: float,
         # contention_extra: float
         contention_map: Dict[Tuple[int, int], float]
@@ -370,7 +367,7 @@ class CloudEdgeSimulator:
                     curr_loc = curr_assignments[curr_node]
                     if parent_loc != curr_loc:
                         output_size_mb = profiling.get_output_size(layer, curr_node)
-                        tx_time = (output_size_mb ) / (bandwidth_MBps)
+                        tx_time = (output_size_mb ) / (bandwidth)
                         rtt_s = rtt_ms / 1000.0
                         transmission_time = max(tx_time, rtt_s)
                         transmission_times.append(transmission_time)
@@ -378,7 +375,7 @@ class CloudEdgeSimulator:
             for i in range(num_nodes):
                 if action_matrix[i, 1] == 1:
                     input_size_mb = profiling.get_input_size()
-                    tx_time = (input_size_mb) / (bandwidth_MBps)
+                    tx_time = (input_size_mb) / (bandwidth)
                     rtt_s = rtt_ms / 1000.0
                     transmission_time = max(tx_time, rtt_s)
                     transmission_times.append(transmission_time)
@@ -644,8 +641,7 @@ class CloudEdgeSimulator:
 
             else:
 
-                # Internal computation uses MB/s.
-                bw = self._get_bandwidth_MBps_at_global_time(
+                bw = self._get_bandwidth_at_global_time(
                     local_time
                 )
 
@@ -784,8 +780,8 @@ class CloudEdgeSimulator:
                 + thread.time_offset
             )
 
-            # Internal bandwidth is MB/s.
-            bw = self._get_bandwidth_MBps_at_global_time(
+            
+            bw = self._get_bandwidth_at_global_time(
                 local_time
             )
 
@@ -969,7 +965,7 @@ class CloudEdgeSimulator:
                     else:
 
                         bw = (
-                            self._get_bandwidth_MBps_at_global_time(
+                            self._get_bandwidth_at_global_time(
                                 local_time
                             )
                         )
@@ -1008,10 +1004,8 @@ class CloudEdgeSimulator:
                         + t.time_offset
                     )
 
-                    # IMPORTANT:
-                    # use MB/s here, not raw Mbps.
                     bw = (
-                        self._get_bandwidth_MBps_at_global_time(
+                        self._get_bandwidth_at_global_time(
                             local_time
                         )
                     )
@@ -1102,7 +1096,7 @@ class CloudEdgeSimulator:
                     )
 
                     bw = (
-                        self._get_bandwidth_MBps_at_global_time(
+                        self._get_bandwidth_at_global_time(
                             local_time
                         )
                     )

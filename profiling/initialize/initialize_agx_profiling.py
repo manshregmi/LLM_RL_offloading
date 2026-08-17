@@ -403,7 +403,7 @@ def get_LLM_profiling_data():
         [0],        # BART 99
         [0],        # BART 100
     ]
-    numberOfEdgeDevice = 12
+    numberOfEdgeDevice = 9
     # -------------------------------
     # ⏱️ Edge execution times (ms)
     # -------------------------------
@@ -2046,9 +2046,9 @@ def get_LLM_profiling_data():
     #     (300, 399, (3,)), ]  # BART
     model_boundary_layers = [
     (0, 0, (0, 1), (1, 0)),          # YOLOS(1), Llama(0)
-    (1, 99, (0,), (0,)),             # Llama
-    (100, 299, (0,), (0,)),          # Llama
-    (300, 399, (0,), (2,)),          # Bart
+    (1, 99, (1,), (0,)),             # Llama
+    (100, 299, (2,), (0,)),          # Llama
+    (300, len(layers) - 1, (3,), (2,)),          # Bart
     ]
 
     profiling_data = ProfilingData(

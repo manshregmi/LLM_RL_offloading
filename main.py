@@ -153,8 +153,8 @@ if __name__ == "__main__":
     print("=" * 80)
     print("LOADING PROFILING DATA")
     print("=" * 80)
-    #profiling_data = get_LLM_profiling_data()
-    profiling_data = get_graph3()
+    profiling_data = get_LLM_profiling_data()
+    #profiling_data = get_graph3()
     #profiling_data = get_graph2()
     pipleline_overhead_time = []
 
@@ -178,6 +178,7 @@ if __name__ == "__main__":
         
         # Define number of episodes for training and baselines
         TRAIN_EPISODES = 1
+
         BASELINE_EPISODES = 1
         
         # # Run baseline schedulers
