@@ -37,7 +37,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
         total_pipelines=total_pipelines
     )
     agent.simulator.reset_layer_count()
-    contention_trace_path = os.path.join("simulator","data","contention_log_20260811_103925.csv")
+    contention_trace_path = os.path.join("simulator","data","contention_log_20260823_152331.csv")
     agent.simulator.load_contention_trace(contention_trace_path)
 
     grouping_RL_agent = GroupingRL(total_pipelines=total_pipelines)
