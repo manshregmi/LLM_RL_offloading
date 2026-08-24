@@ -64,8 +64,7 @@ ALPHA_VALUE = 0.1                   # value table learning rate (higher: critic
 # 10 bins per dimension -> 100 states. Coarse enough for fast convergence,
 # fine enough to capture meaningful (bw, contention) variation.
 
-# Bin edges — adjust these to match your simulator's real BW/contention ranges.
-bw_path = os.path.join("simulator", "data", "bw_data.csv")
+bw_path = os.path.join("simulator", "data", "contention_log_20260823_152331.csv")
 df = pd.read_csv(bw_path)
 bw_mbps = df["bandwidth_mbps"]
 
@@ -156,6 +155,7 @@ class GroupingRL:
         # --- Bookkeeping for the last action chosen (for sync use) ---
         self.last_state_key = None
         self.last_action_key = None
+        
 
     def _ensure_reward_queue(self):
         """
@@ -284,9 +284,23 @@ class GroupingRL:
         self.value_table[state_key] = V_s + self.alpha_value * td_error
 
         # --- Actor update ---
-        old_pref = self.policy_table.get((state_key, action_key), 0.0)
-        self.policy_table[(state_key, action_key)] = old_pref + self.alpha_policy * td_error
+        # old_pref = self.policy_table.get((state_key, action_key), 0.0)
+        # self.policy_table[(state_key, action_key)] = old_pref + self.alpha_policy * td_error
 
+        
+        probs = self._policy_probs(state_key)  # shape (num_actions,)
+    
+    # 2. Apply the full softmax gradient to every action
+        for a in range(self.num_actions):
+            # Gradient of log π(a|s) w.r.t θ_a
+            if a == action_key:
+                grad = 1.0 - probs[a]
+            else:
+                grad = -probs[a]
+            
+            # Update preference
+            old_pref = self.policy_table.get((state_key, a), 0.0)
+            self.policy_table[(state_key, a)] = old_pref + self.alpha_policy * td_error * grad
         self.step_count += 1
 
         return {

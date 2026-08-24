@@ -1,9 +1,11 @@
+import os
 import random
 import numpy as np
 import matplotlib.pyplot as plt
 # from simulator.simulator import CloudEdgeSimulator  # OLD
 # from profiling.initialize.initialize_graph3 import get_graph3
 from profiling.initialize.initialize_agx_profiling import get_LLM_profiling_data
+from profiling.initialize.initialize_graph2 import get_graph2
 from profiling.initialize.initialize_graph3 import get_graph3
 from profiling.profiling_class import ProfilingData
 # Import your new simulator
@@ -70,15 +72,19 @@ def run_scheduler(profiling_data: ProfilingData, episodes=10, max_steps=5000, sc
     
     # Initialize simulator
     simulator = CloudEdgeSimulator(profiling_data)
+
+    contention_trace_path = os.path.join("simulator","data","contention_log_20260823_152331.csv")
+    simulator.load_contention_trace(contention_trace_path)
     
     # Reset episode time for each run
     simulator.reset_episode_time()
-    initial_bandwidth = simulator.get_current_bandwidth()
+    initial_bandwidth = 12
     initial_cloud_contention = 0.0  # No pending cloud work initially
     initial_layer = 0
     episode_num_of_tokens = []
 
     for ep in range(episodes):
+        simulator.reset_layer_count()
         # Reset for new episode
         
         # Initial state: [bandwidth, cloud_contention, layer, previous_action_pattern]
@@ -90,8 +96,7 @@ def run_scheduler(profiling_data: ProfilingData, episodes=10, max_steps=5000, sc
         step_count = 0
         
         for step in range(max_steps):
-            current_layer = state[2]
-            
+            current_layer = simulator.layer_index
             # Get action based on scheduler type
             if scheduler_type == 'random':
                 action = get_random_action(profiling_data, current_layer)
@@ -113,10 +118,10 @@ def run_scheduler(profiling_data: ProfilingData, episodes=10, max_steps=5000, sc
                 raise ValueError(f"Unknown scheduler_type: {scheduler_type}")
             
             # Check if all nodes are going to cloud (for special handling)
-            is_all_cloud = (scheduler_type == 'all_cloud') or (np.all(action[:, 1] == 1))
+            is_all_cloud = (scheduler_type == 'all_cloud')
             
             # Get cloud waiting time for next state
-            next_cloud_pending = simulator.get_next_state_cloud_waiting_time(
+            next_cloud_pending, bandwidth = simulator.get_next_state_cloud_waiting_time(
                 next_layer=current_layer,  # Wait time for current layer's processing
                 current_action=action,
                 isAllCloud=is_all_cloud
@@ -134,6 +139,7 @@ def run_scheduler(profiling_data: ProfilingData, episodes=10, max_steps=5000, sc
             
             # Get next state
             next_state, terminal = simulator.get_next_state(
+                bandwidth=bandwidth,
                 current_state=state,
                 action=action,
                 new_cloud_pending=next_cloud_pending
@@ -153,6 +159,7 @@ def run_scheduler(profiling_data: ProfilingData, episodes=10, max_steps=5000, sc
             
             # Check if episode is complete
             if terminal:
+                current_layer = 0
                 break
         
         # Convert latency to ms for reporting
@@ -239,10 +246,11 @@ if __name__ == "__main__":
     # Load profiling data
     #profiling_data = ProfilingData(...)  # Load your profiling data
     profiling_data = get_LLM_profiling_data()
+    #profiling_data = get_graph3()
     # Run different schedulers
     # avg_latency, avg_reward, misses = run_scheduler(profiling_data, episodes=1000, scheduler_type='random')
-    #avg_latency, avg_reward, misses = run_scheduler(profiling_data, episodes=2000, scheduler_type='all_edge')
-    avg_latency, avg_reward, misses = run_scheduler(profiling_data, episodes=1, scheduler_type='all_cloud')
-    # avg_latency, avg_reward, misses = run_scheduler(profiling_data, episodes=1000, scheduler_type='half_edge')
-    # avg_latency, avg_reward, misses = run_scheduler(profiling_data, episodes=1, scheduler_type='half_cloud')
+    avg_latency, avg_reward, misses = run_scheduler(profiling_data, episodes=1, scheduler_type='all_edge')
+    # avg_latency, avg_reward, misses = run_scheduler(profiling_data, episodes=2000, scheduler_type='all_cloud')
+    #avg_latency, avg_reward, misses = run_scheduler(profiling_data, episodes=2000, scheduler_type='half_edge')
+    #avg_latency, avg_reward, misses = run_scheduler(profiling_data, episodes=2000, scheduler_type='half_cloud')
     pass

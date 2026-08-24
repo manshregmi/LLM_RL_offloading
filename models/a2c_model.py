@@ -38,7 +38,7 @@ class TabularActorCriticAgent:
         self.policy_table = {}
         self.value_table = {}
         self.simulator = CloudEdgeSimulator(profiling_data, total_pipeline=total_pipelines)
-        bw_path = os.path.join("simulator", "data", "bw_data.csv")
+        bw_path = os.path.join("simulator", "data", "contention_log_20260823_152331.csv")
         df = pd.read_csv(bw_path)
         bw_mbps = df["bandwidth_mbps"]
 
@@ -49,10 +49,11 @@ class TabularActorCriticAgent:
 
         self.cloudtime_bins = np.linspace(0, 45, 20)
 
-        self.temperature = 1.0
+        self.temperature = 0.15
         self.temperature_min = 0.01
         self.temperature_decay = 0.9995
-        self.temperature_boost = 1.5
+        # self.temperature_decay = 1
+        self.temperature_boost = 0.15
 
         self.best_episode_latency = float('inf')
         self.episodes_since_improvement = 0
@@ -258,11 +259,10 @@ class TabularActorCriticAgent:
         layer = self.simulator.get_current_layer_index()
         next_layer = min(layer + 1, len(self.profiling.layers) - 1)
 
-        cloud_waiting_time = self.simulator.get_next_state_cloud_waiting_time(
-            next_layer=next_layer,
-            current_action=action,
-            isAllCloud=False,
+        result = self.simulator.get_next_state_cloud_waiting_time(
+            next_layer, action, False
         )
+        cloud_waiting_time, bandwidth = result
 
         latency_s = self.simulator.compute_latency(
             current_state=current_state,
@@ -278,6 +278,7 @@ class TabularActorCriticAgent:
             current_state=current_state,
             action=action,
             new_cloud_pending=cloud_waiting_time,
+            bandwidth=bandwidth
         )
 
         latency_ms = latency_s * 1000
@@ -308,7 +309,7 @@ class TabularActorCriticAgent:
         # )
         #soft robut td error
 
-        td_error = np.clip(target - V_current, -5000.0, 5000.0)
+        td_error = np.clip(target - V_current, -50000.0, 50000.0)
         # td_error = (reward-self.average_reward + V_next - V_current)
         # td_error = np.clip(td_error, -10.0, 10.0)
 

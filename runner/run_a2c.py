@@ -15,7 +15,7 @@ def create_initial_state(simulator):
     
     State format: [bandwidth, cloud_contention, layer, previous_assignment]
     """
-    bandwidth = simulator.get_current_bandwidth()
+    bandwidth = 12
     cloud_contention = 0.0  # No pending cloud tasks at start
     previous_assignment = None  # No previous layer
     segment = simulator.get_segment_tuple(0)

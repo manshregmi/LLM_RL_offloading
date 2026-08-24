@@ -2066,11 +2066,11 @@ def get_graph2():
     number_of_op_tokens[(0, 0)] = 100
     dual_dependency_nodes =[(0,0)]
     model_boundary_layers = [
-        (0, 0, (0, 1, 2)),         # YOLOS and two LLaMAs
-        (1, 99, (1, 2)),           # Two parallel LLaMAs
-        (100, 199, (1,)),          # Remaining first LLaMA
-        (200, 399, (3,)),    # BART
-        ]    
+    (0, 0, (0, 1, 2), (1, 0, 0)),      # YOLOS, LLaMA-1, LLaMA-2
+    (1, 99, (1, 2), (0, 0)),            # Two LLaMA branches
+    (100, 199, (1,), (0,)),             # Remaining LLaMA branch
+    (200, 399, (3,), (2,)),             # BART
+]
     
 
 
