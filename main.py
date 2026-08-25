@@ -177,7 +177,7 @@ if __name__ == "__main__":
         # print("=" * 80)
         
         # Define number of episodes for training and baselines
-        TRAIN_EPISODES = 10000
+        TRAIN_EPISODES = 100
 
         BASELINE_EPISODES = 1
         
