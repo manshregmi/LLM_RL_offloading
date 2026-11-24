@@ -75,9 +75,12 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
     average_step_overhead_times = []
     episode_number_of_groups = []
     episode_generated_tokens= []
-    latency_groups = {}
+    latency_groups = []
+    group_index = []
     L= grouping_RL_agent.L
-    for groups in range(1, L // 2 + 1): 
+    b = grouping_RL_agent.B
+    phi = grouping_RL_agent.phi
+    for groups in range(b, ((L //2)+1), phi): 
         latencies_for_k = []
         print("=" * 60)
         print(f"Testing K={groups}/{L // 2}")
@@ -91,6 +94,7 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
             td_errors = []
             step_overhead_time = []
             last_pipeline_contention.append(state[1])
+            episode_latency_ms = 0
             
             #number_of_groups = grouping_RL_agent.train(bandwidth, average_last_pipeline_contention)
             # print("number of groups: ", number_of_groups)
@@ -101,6 +105,8 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
             count = 0
             while not done:
                 action, reward, latency_s, next_state, done, overhead_time_per_step, cached_count = agent.step(state, num_groups= groups , count=count)
+                episode_latency_ms += (latency_s*1000)
+                
                 # if (step_count < 2):
                 #     print("first two actions are:", action)
                 if(done):
@@ -127,8 +133,8 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
             
             # End episode
             total_latency_ms, total_reward = agent.end_episode()
-            latencies_for_k.append(total_latency_ms)
-            episode_latencies.append(total_latency_ms)
+            latencies_for_k.append(episode_latency_ms)
+            episode_latencies.append(episode_latency_ms)
             episode_rewards.append(total_reward)
             
             # grouping_RL_agent._update_tables(
@@ -165,19 +171,20 @@ def train_a2c_agent(profiling_data: ProfilingData, episodes=50000, is_test=False
                     f"TD: {avg_td_error:6.2f} | "
                     f"Steps: {step_count}")
         mean_latency = np.mean(latencies_for_k)
-        latency_groups[groups] = (mean_latency)
-        print(f"\nK={groups:3d} COMPLETE | " f"Mean Latency = {mean_latency:.4f} ms")
+        latency_groups.append(mean_latency)
+        group_index.append(groups)
+        print(f"K={groups:3d} COMPLETE | " f"Mean Latency = {mean_latency:.4f} ms")
     
     # Final save
     agent.save()
     
-    k_values = sorted(latency_groups.keys())
+    # k_values = sorted(latency_groups.keys())
 
-    mean_latencies = [latency_groups[k]for k in k_values]
+    # mean_latencies = [latency_groups[k]for k in k_values]
 
     plt.figure(figsize=(10, 6))
 
-    plt.plot( k_values,mean_latencies,linewidth=1.5)
+    plt.plot( group_index,latency_groups,linewidth=1.5)
     plt.xlabel("Number of Groups (K)")
     plt.ylabel("Mean Latency (ms)")
     plt.title("Number of Groups vs Mean Latency")

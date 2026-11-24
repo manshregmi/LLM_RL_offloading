@@ -49,11 +49,11 @@ class TabularActorCriticAgent:
 
         self.cloudtime_bins = np.linspace(0, 45, 20)
 
-        self.temperature = 0.15
+        self.temperature = 0.0
         self.temperature_min = 0.01
         self.temperature_decay = 0.9995
         # self.temperature_decay = 1
-        self.temperature_boost = 0.15
+        self.temperature_boost = 0.0
 
         self.best_episode_latency = float('inf')
         self.episodes_since_improvement = 0
