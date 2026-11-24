@@ -296,15 +296,19 @@ class CloudEdgeSimulator:
             )
 
             if model_idx == 0:       # LLaMA
+                print(f"LLAMA {model_idx}")
                 contention_extra = llama_extra
 
             elif model_idx == 1:     # YOLOS
+                print(f"YOLOS {model_idx}")
                 contention_extra = yolos_extra
 
             elif model_idx == 2:     # BART
+                print(f"BART {model_idx}")
                 contention_extra = bart_extra
 
             else:
+                print(f"did not satisfied {model_idx}")
                 contention_extra = 0.0
 
             cloud_proc_ms = float(self.profiling.get_node_cloud_time(layer,node_idx))
@@ -524,7 +528,7 @@ class CloudEdgeSimulator:
 
         # Update cumulative time
         self.cumulative_time_seconds += completion_time_s
-        # print(f"EOS1 {self.isEos1} and  EOS 2 {self.isEos2} has total time {completion_time_s*1000} for level {self.layer_index} with bandwidth {current_state[0]}  and cloudlet contetion {current_state[1]} and segment {current_state[2]} and assignment vector is {current_action}", )
+        print(f"EOS1 {self.isEos1} and  EOS 2 {self.isEos2} has total time {completion_time_s*1000} for level {self.layer_index} with bandwidth {current_state[0]}, and transmission time {(max_transmission_time*1000)}  and cloudlet computation {cloud_pending_ms},and idle time is {(actual_idle_time_s*1000)} and segment {current_state[2]} and assignment vector is {current_action}", )
         return completion_time_s
 
     # ================= PURE LATENCY REWARD =================

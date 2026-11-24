@@ -23,7 +23,7 @@ class TabularActorCriticAgent:
         gamma=0.95,
         reward_scale=10.0,
         total_pipelines=1,
-        average_reward_lr=0.015
+        # average_reward_lr=0.015
     ):
         self.profiling = profiling_data
         self.is_test = is_test
@@ -152,51 +152,184 @@ class TabularActorCriticAgent:
         # ========== GROUPED CASE (level‑only caching) ==========
         if num_groups is not None and num_groups > 0:
             chunk_idx = self._get_chunk_index(layer, num_groups)
-            cache_key = (num_groups, chunk_idx)   # no state
+            cache_key = (num_groups, chunk_idx)
 
             if cache_key in self.group_range_assignments:
-                count += 1   # optional debug counter
-                grouped_assignment= self.group_range_assignments[cache_key]
-                cached_assignment_vector = grouped_assignment[0][1]
-                cached_assignments = []
-                for _ in range(self.profiling.get_num_nodes(self.simulator.get_current_layer_index())):
-                    cached_assignments.append([self.simulator.get_current_layer_index(), (1 if cached_assignment_vector > 0 else 0)])
-                return np.array(cached_assignments), count
-        
-            # Simulate the whole chunk using the current state (raw values)
-            start_layer, end_layer = self._get_chunk_range(chunk_idx, num_groups)
-            # print(f"start layer and end layer is {start_layer}, {end_layer}")
-            curr_state = (state_bw, state_ctime, start_layer, original_prev_assignment)
-            actions_in_chunk = []
+                count += 1
+                majority_actions = self.group_range_assignments[cache_key]
 
-            for l in range(start_layer, end_layer + 1):
-                action_2d = self._get_policy_action(curr_state)
-                # print(f"action for layer {l} is {action_2d}")
-                hashable = self._action_to_hashable(action_2d)
-                actions_in_chunk.append((action_2d, hashable))
-                curr_state = (state_bw, state_ctime, l + 1, action_2d)
-
-            # Majority vote on hashable tuples
-            if actions_in_chunk:
-                counter = Counter(h for _, h in actions_in_chunk)
-                max_count = max(counter.values())
-                majority_hashables = [h for h, cnt in counter.items() if cnt == max_count]
-
-                if len(majority_hashables) == 1:
-                    target_hash = majority_hashables[0]
-                    chosen_action = next(act for act, h in actions_in_chunk if h == target_hash)
-                else:
-                    chosen_action = actions_in_chunk[0][0]   # tie → first action
             else:
-                chosen_action = self._get_default_action(layer)
+                start_layer, end_layer = self._get_chunk_range(
+                    chunk_idx, num_groups
+                )
 
-            self.group_range_assignments[cache_key] = chosen_action
-            assignment_vector = chosen_action[0][1]
-            actions = []
+                curr_state = (
+                    state_bw,
+                    state_ctime,
+                    start_layer,
+                    original_prev_assignment
+                )
+
+                votes = {}
+
+                for l in range(start_layer, end_layer + 1):
+
+                    action = self._get_policy_action(curr_state)
+
+                    for node_idx in range(action.shape[0]):
+                        if node_idx not in votes:
+                            votes[node_idx] = []
+
+                        votes[node_idx].append(int(action[node_idx, 1]))
+
+                    curr_state = (
+                        state_bw,
+                        state_ctime,
+                        l + 1,
+                        action
+                    )
+
+                # Calculate majority for each node position
+                majority_actions = []
+
+                for n in sorted(votes):
+                    majority = np.argmax(
+                        np.bincount(votes[n], minlength=2)
+                    )
+                    majority_actions.append(majority)
+
+                # Cache the majority actions
+                self.group_range_assignments[cache_key] = majority_actions
+
             current_layer = self.simulator.get_current_layer_index()
-            for _ in range(self.profiling.get_num_nodes(current_layer)):
-                actions.append([current_layer, (1 if assignment_vector > 0 else 0)])
-            return np.array(actions), count
+            actions = []
+
+            for n in range(self.profiling.get_num_nodes(current_layer)):
+                actions.append([current_layer, majority_actions[n]])
+
+            actions = np.array(actions, dtype=int)
+
+            # print(f"Level {current_layer}: {actions.tolist()}")
+
+            return actions, count
+        # if num_groups is not None and num_groups > 0:
+
+        #     # Identify the current group among the K groups
+        #     chunk_idx = self._get_chunk_index(layer, num_groups)
+        #     cache_key = (num_groups, chunk_idx)
+           
+
+        #     # If this group has already been processed, reuse its majorities
+        #     if cache_key in self.group_range_assignments:
+        #         count += 1
+        #         majority_actions = self.group_range_assignments[cache_key]
+                
+
+        #     else:
+        #         # Get all levels belonging to this group
+        #         start_layer, end_layer = self._get_chunk_range(
+        #             chunk_idx, num_groups
+        #         )
+                
+
+        #         curr_state = (
+        #             state_bw,
+        #             state_ctime,
+        #             start_layer,
+        #             original_prev_assignment
+        #         )
+
+        #         votes = {}
+
+        #         # STEP 1: Loop over every level in the current group
+        #         for l in range(start_layer, end_layer + 1):
+
+        #             action = self._get_policy_action(curr_state)
+
+
+        #             # STEP 2: Collect each node position's vote
+        #             for node_idx in range(action.shape[0]):
+        #                 if node_idx not in votes:
+        #                     votes[node_idx] = []
+
+        #                 votes[node_idx].append(int(action[node_idx, 1]))
+
+        #             curr_state = (
+        #                 state_bw,
+        #                 state_ctime,
+        #                 l + 1,
+        #                 action
+        #             )
+
+        #         # STEP 3: Calculate majority for each node position
+        #             majority_actions = []
+
+        #             for n in sorted(votes):
+        #                 majority = np.argmax(np.bincount(votes[n], minlength=2))
+        #                 majority_actions.append(majority)
+
+        #             # Save the majority actions for this group
+        #             self.group_range_assignments[cache_key] = majority_actions
+
+        #             # Build the final action array for the current level
+        #             current_layer = self.simulator.get_current_layer_index()
+        #             actions = []
+
+        #             for n in range(self.profiling.get_num_nodes(current_layer)):
+        #                 actions.append([current_layer, majority_actions[n]])
+
+        #             actions = np.array(actions, dtype=int)
+                    
+        #         # print(f"Level {current_layer}: {actions.tolist()}")
+
+        #     return actions, count
+        # if num_groups is not None and num_groups > 0:
+        #     chunk_idx = self._get_chunk_index(layer, num_groups)
+        #     cache_key = (num_groups, chunk_idx)   # no state
+
+        #     if cache_key in self.group_range_assignments:
+        #         count += 1   # optional debug counter
+        #         grouped_assignment= self.group_range_assignments[cache_key]
+        #         cached_assignment_vector = grouped_assignment[0][1]
+        #         cached_assignments = []
+        #         for _ in range(self.profiling.get_num_nodes(self.simulator.get_current_layer_index())):
+        #             cached_assignments.append([self.simulator.get_current_layer_index(), (1 if cached_assignment_vector > 0 else 0)])
+        #         return np.array(cached_assignments), count
+        
+        #     # Simulate the whole chunk using the current state (raw values)
+        #     start_layer, end_layer = self._get_chunk_range(chunk_idx, num_groups)
+        #     # print(f"start layer and end layer is {start_layer}, {end_layer}")
+        #     curr_state = (state_bw, state_ctime, start_layer, original_prev_assignment)
+        #     actions_in_chunk = []
+
+        #     for l in range(start_layer, end_layer + 1):
+        #         action_2d = self._get_policy_action(curr_state)
+        #         # print(f"action for layer {l} is {action_2d}")
+        #         hashable = self._action_to_hashable(action_2d)
+        #         actions_in_chunk.append((action_2d, hashable))
+        #         curr_state = (state_bw, state_ctime, l + 1, action_2d)
+
+        #     # Majority vote on hashable tuples
+        #     if actions_in_chunk:
+        #         counter = Counter(h for _, h in actions_in_chunk)
+        #         max_count = max(counter.values())
+        #         majority_hashables = [h for h, cnt in counter.items() if cnt == max_count]
+
+        #         if len(majority_hashables) == 1:
+        #             target_hash = majority_hashables[0]
+        #             chosen_action = next(act for act, h in actions_in_chunk if h == target_hash)
+        #         else:
+        #             chosen_action = actions_in_chunk[0][0]   # tie → first action
+        #     else:
+        #         chosen_action = self._get_default_action(layer)
+
+        #     self.group_range_assignments[cache_key] = chosen_action
+        #     assignment_vector = chosen_action[0][1]
+        #     actions = []
+        #     current_layer = self.simulator.get_current_layer_index()
+        #     for _ in range(self.profiling.get_num_nodes(current_layer)):
+        #         actions.append([current_layer, (1 if assignment_vector > 0 else 0)])
+        #     return np.array(actions), count
 
         # ========== NON‑GROUPED CASE (original) ==========
         actions = self._get_possible_actions()
