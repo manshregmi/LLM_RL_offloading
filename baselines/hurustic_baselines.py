@@ -4,9 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 # from simulator.simulator import CloudEdgeSimulator  # OLD
 # from profiling.initialize.initialize_graph3 import get_graph3
-from profiling.initialize.initialize_agx_profiling import get_LLM_profiling_data
+#from profiling.initialize.initialize_agx_profiling import get_LLM_profiling_data
 from profiling.initialize.initialize_graph2 import get_graph2
-from profiling.initialize.initialize_graph3 import get_graph3
+#from profiling.initialize.initialize_graph3 import get_graph3
 from profiling.profiling_class import ProfilingData
 # Import your new simulator
 from simulator.simulator import CloudEdgeSimulator  # Update import path as needed
@@ -245,8 +245,8 @@ def run_random_scheduler(profiling_data: ProfilingData, episodes=10, max_steps=2
 if __name__ == "__main__":
     # Load profiling data
     #profiling_data = ProfilingData(...)  # Load your profiling data
-    profiling_data = get_LLM_profiling_data()
-    #profiling_data = get_graph3()
+    # profiling_data = get_LLM_profiling_data()
+    profiling_data = get_graph2()
     # Run different schedulers
     # avg_latency, avg_reward, misses = run_scheduler(profiling_data, episodes=1000, scheduler_type='random')
     avg_latency, avg_reward, misses = run_scheduler(profiling_data, episodes=1, scheduler_type='all_edge')
